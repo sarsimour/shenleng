@@ -1,0 +1,72 @@
+name: Deploy Shenleng Site
+
+on:
+  push:
+    branches: ["master"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 传输核心文件到服务器 (无需在 Github Action 中构建，直接在服务器构建)
+      # 优点：节省 Github Action 时间，避免大文件传输；
+      # 缺点：占用服务器 CPU (但 Next.js Standalone 构建还算快)
+      - name: Copy files to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          # 传输除 .git 和 node_modules 外的所有文件
+          # 由于 scp-action 不支持排除，我们传输整个目录内容，
+          # 但通常最好先在 Runner 里打包一个 tar.gz 再传。
+          # 这里为了简单，我们假设您的项目体积不大。
+          # 更好的做法是只传源码。
+          source: "."
+          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+          rm: true # 覆盖前清理
+
+      - name: Build and Restart Docker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            set -e
+            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            cd "$PROJECT_DIR"
+
+            # 创建数据持久化目录 (如果不存在)
+            mkdir -p data/media
+            
+            # 构建镜像
+            echo "🐳 Building Docker image..."
+            docker build -t shenleng-site .
+
+            # 停止旧容器
+            echo "🛑 Stopping old container..."
+            docker stop shenleng-container || true
+            docker rm shenleng-container || true
+
+            # 启动新容器
+            # 挂载 payload.db 到宿主机的 data 目录
+            # 挂载 public/media 到宿主机的 data/media 目录
+            echo "🚀 Starting new container..."
+            docker run -d \
+              --name shenleng-container \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -v $(pwd)/data/payload.db:/app/payload.db \
+              -v $(pwd)/data/media:/app/public/media \
+              -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
+              -e DATABASE_URI="file:/app/payload.db" \
+              -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
+              shenleng-site
+
+            # 清理无用镜像
+            docker image prune -f
+            
+            echo "✅ Deployment successful!"

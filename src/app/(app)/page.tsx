@@ -2,6 +2,7 @@ import Hero from "@/components/sections/Hero";
 import Services from "@/components/sections/Services";
 import ValueProp from "@/components/sections/ValueProp";
 import Trust from "@/components/sections/Trust";
+import News from "@/components/sections/News";
 
 export default function Home() {
   return (
@@ -9,6 +10,7 @@ export default function Home() {
       <Hero />
       <Services />
       <ValueProp />
+      <News />
       <Trust />
     </>
   );
