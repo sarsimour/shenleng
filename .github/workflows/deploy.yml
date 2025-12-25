@@ -10,51 +10,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 传输核心文件到服务器 (无需在 Github Action 中构建，直接在服务器构建)
-      # 优点：节省 Github Action 时间，避免大文件传输；
-      # 缺点：占用服务器 CPU (但 Next.js Standalone 构建还算快)
-      - name: Copy files to Server
+      # 1. 在 GitHub Runner (海外环境) 构建镜像
+      # 这里网络通畅，拉取 node:20-alpine 没问题
+      - name: Build Docker Image
+        run: |
+          echo "🐳 Building Docker image..."
+          docker build -t shenleng-site .
+          
+          echo "📦 Saving and compressing image..."
+          # 保存镜像为 tar 文件并压缩，大大减少传输时间
+          docker save shenleng-site | gzip > shenleng-site.tar.gz
+
+      # 2. 上传 镜像包 和 必要的配置 到服务器
+      - name: Copy Image to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          # 传输除 .git 和 node_modules 外的所有文件
-          # 由于 scp-action 不支持排除，我们传输整个目录内容，
-          # 但通常最好先在 Runner 里打包一个 tar.gz 再传。
-          # 这里为了简单，我们假设您的项目体积不大。
-          # 更好的做法是只传源码。
-          source: "."
+          # 增加超时时间，防止文件过大导致断开
+          timeout: 10m
+          # 只上传构建好的镜像包和必要的挂载目录结构
+          source: "shenleng-site.tar.gz"
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-          rm: true # 覆盖前清理
 
-      - name: Build and Restart Docker
+      # 3. SSH 登录，加载镜像并重启
+      - name: Load Image and Restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 10m
           script: |
             set -e
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
 
-            # 创建数据持久化目录 (如果不存在)
+            # 1. 准备数据目录
             mkdir -p data/media
-            
-            # 构建镜像
-            echo "🐳 Building Docker image..."
-            docker build -t shenleng-site .
 
-            # 停止旧容器
+            # 2. 加载镜像 (从 tar.gz 文件)
+            echo "📥 Loading Docker image..."
+            docker load < shenleng-site.tar.gz
+
+            # 3. 停止并清理旧容器
             echo "🛑 Stopping old container..."
             docker stop shenleng-container || true
             docker rm shenleng-container || true
 
-            # 启动新容器
-            # 挂载 payload.db 到宿主机的 data 目录
-            # 挂载 public/media 到宿主机的 data/media 目录
+            # 4. 启动新容器
             echo "🚀 Starting new container..."
+            # 注意：Payload CMS 需要 DATABASE_URI 和 PAYLOAD_SECRET
+            # 这里的环境变量如果是固定的，可以直接写；如果是敏感的，建议在服务器建立 .env 文件引用
+            # 或者通过 GitHub Secrets 注入
             docker run -d \
               --name shenleng-container \
               --restart unless-stopped \
@@ -66,7 +75,8 @@ jobs:
               -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               shenleng-site
 
-            # 清理无用镜像
+            # 5. 清理文件
+            rm shenleng-site.tar.gz
             docker image prune -f
             
             echo "✅ Deployment successful!"
