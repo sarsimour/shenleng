@@ -1,14 +1,19 @@
 import { withPayload } from '@payloadcms/next/withPayload'
 import type { NextConfig } from "next";
+import path from 'path';
 
 const nextConfig: NextConfig = {
-  // Docker 部署必须：生成独立的最小化运行包
+  // Docker 部署必须
   output: "standalone",
   
-  // 必须：排除构建时不需要打包的二进制依赖
+  // 排除核心包打包
   serverExternalPackages: ['payload', 'sharp'],
   
-  // 忽略构建检查，确保部署顺利
+  env: {
+    // 强制指定 Payload 配置文件路径，解决 "config required" 错误
+    PAYLOAD_CONFIG_PATH: path.resolve(process.cwd(), 'src/payload.config.ts'),
+  },
+  
   typescript: {
     ignoreBuildErrors: true,
   },
