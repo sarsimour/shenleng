@@ -32,6 +32,32 @@ export const Articles: CollectionConfig = {
       label: '摘要',
     },
     {
+      name: 'legacyHtml',
+      type: 'textarea',
+      label: '遗留 HTML 内容',
+      admin: {
+        description: '仅用于展示从旧官网迁移的 HTML 内容',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'isLegacy',
+      type: 'checkbox',
+      label: '是否为旧文章',
+      defaultValue: false,
+      admin: {
+        readOnly: true,
+      },
+    },
+    {
+      name: 'originalUrl',
+      type: 'text',
+      label: '原始 URL',
+      admin: {
+        readOnly: true,
+      },
+    },
+    {
       name: 'videoUrl',
       type: 'text',
       label: '视频链接 (可选)',
