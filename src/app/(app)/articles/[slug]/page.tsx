@@ -74,8 +74,8 @@ export default async function ArticlePage({ params }: Props) {
       </div>
 
       {/* Article Body */}
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 mt-12 flex flex-col lg:flex-row gap-12">
-        <div className="lg:w-2/3">
+      <div className="mx-auto max-w-4xl px-6 lg:px-8 mt-12">
+        <div className="w-full">
           {article.isLegacy ? (
             // 渲染旧版 HTML
             <div 
@@ -86,7 +86,7 @@ export default async function ArticlePage({ params }: Props) {
           ) : (
             // 这里以后对接 Lexical 渲染器
             <div className="prose prose-lg prose-slate max-w-none">
-              <p>新文章 RichText 渲染待接入...</p>
+              <p>新文章内容待接入...</p>
             </div>
           )}
           
@@ -96,25 +96,6 @@ export default async function ArticlePage({ params }: Props) {
                <button className="flex items-center gap-2 hover:text-brand-deep transition-colors">
                  <Share2 size={16} /> 分享
                </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar CTA */}
-        <div className="lg:w-1/3">
-          <div className="sticky top-24 bg-brand-deep rounded-2xl p-8 text-white shadow-xl shadow-brand-deep/20">
-            <h3 className="text-xl font-bold mb-4">需要专业的冷链物流建议？</h3>
-            <p className="text-blue-100 text-sm leading-relaxed mb-8">
-              我们的专家团队随时准备为您解决复杂的冷链挑战，提供定制化的运输与保障方案。
-            </p>
-            <div className="space-y-4">
-              <a href="tel:123456789" className="flex items-center justify-center gap-2 w-full bg-white text-brand-deep font-bold py-3 rounded-xl hover:bg-blue-50 transition-colors">
-                <Phone size={18} />
-                立即拨打电话
-              </a>
-              <Button variant="secondary" className="w-full py-6 rounded-xl text-base">
-                获取专业解决方案
-              </Button>
             </div>
           </div>
         </div>

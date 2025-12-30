@@ -13,6 +13,7 @@ export default async function News() {
     collection: "articles",
     sort: "-publishedAt",
     limit: 3,
+    depth: 1, // 确保获取 Media 对象的完整数据
   });
 
   const articles = result.docs;
@@ -41,9 +42,9 @@ export default async function News() {
               ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
               : "";
             
-            // 获取封面图 URL
-            const coverImageUrl = typeof article.coverImage === 'object' && article.coverImage 
-              ? article.coverImage.url 
+            // 使用 filename 手动拼接路径，确保与 Next.js 静态目录匹配
+            const coverImageUrl = article.coverImage?.filename 
+              ? `/media/${article.coverImage.filename}` 
               : null;
 
             return (

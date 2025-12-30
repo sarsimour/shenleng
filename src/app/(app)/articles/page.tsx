@@ -16,7 +16,8 @@ export default async function ArticlesIndex() {
   const result = await payload.find({
     collection: "articles",
     sort: "-publishedAt",
-    limit: 50, // 暂时展示前50篇，后续可加分页
+    limit: 50,
+    depth: 1, // 确保获取 Media 对象的完整数据
   });
 
   const articles = result.docs;
@@ -39,8 +40,8 @@ export default async function ArticlesIndex() {
               ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
               : "";
             
-            const coverImageUrl = typeof article.coverImage === 'object' && article.coverImage 
-              ? article.coverImage.url 
+            const coverImageUrl = article.coverImage?.filename 
+              ? `/media/${article.coverImage.filename}` 
               : null;
 
             return (
