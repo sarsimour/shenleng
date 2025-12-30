@@ -128,6 +128,12 @@ export interface Article {
   slug: string;
   summary?: string | null;
   /**
+   * 仅用于展示从旧官网迁移的 HTML 内容
+   */
+  legacyHtml?: string | null;
+  isLegacy?: boolean | null;
+  originalUrl?: string | null;
+  /**
    * 支持 YouTube, Bilibili 等外部视频链接
    */
   videoUrl?: string | null;
@@ -285,6 +291,9 @@ export interface ArticlesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   summary?: T;
+  legacyHtml?: T;
+  isLegacy?: T;
+  originalUrl?: T;
   videoUrl?: T;
   coverImage?: T;
   content?: T;
