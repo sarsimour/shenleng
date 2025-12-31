@@ -48,14 +48,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
 COPY --from=builder --chown=nextjs:nodejs /app/src/payload.config.ts ./src/payload.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections
 
-RUN mkdir -p public/media && chown -R nextjs:nodejs public/media
+# RUN mkdir -p public/media && chown nextjs:nodejs public/media
 
+# 全局安装 tsx
 RUN npm install -g tsx
 
-USER nextjs
+# 暂时切换回 root 以彻底解决 SQLite 挂载卷的权限问题
+# USER nextjs
 EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
 
 # 关键：启动时先尝试迁移，再运行应用。使用 && 确保顺序执行。
 CMD ["sh", "-c", "if [ ! -f /app/payload.db ]; then npm run migrate:content; fi && npm start"]
