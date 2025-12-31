@@ -19,6 +19,7 @@
     "@payloadcms/ui": "^3.69.0",
     "@types/nodemailer": "^7.0.4",
     "clsx": "^2.1.1",
+    "graphql": "^16.8.1",
     "lucide-react": "^0.562.0",
     "next": "15.4.10",
     "nodemailer": "^7.0.12",
