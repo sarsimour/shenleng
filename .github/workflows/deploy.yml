@@ -10,20 +10,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 在 GitHub Runner 构建镜像
       - name: Build Docker Image
         run: |
           echo "🐳 Building Docker image..."
-          # 确保 package-lock.json 存在
-          npm install --package-lock-only
+          npm install --package-lock-only --legacy-peer-deps
           docker build -t shenleng-site .
           
           echo "📦 Saving and compressing image..."
           docker save shenleng-site | gzip > shenleng-site.tar.gz
 
-      # 2. 上传 镜像包 到服务器
-      # 修正：不再上传 payload.db 和 media，防止覆盖生产数据
-      - name: Copy Files to Server
+      - name: Copy Image to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
@@ -33,7 +29,6 @@ jobs:
           source: "shenleng-site.tar.gz"
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
 
-      # 3. SSH 登录，加载镜像并重启
       - name: Load Image and Restart
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -46,27 +41,17 @@ jobs:
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
 
-            # 1. 准备数据持久化目录
             mkdir -p data/media
 
-            # 2. 检查是否为首次部署（是否有数据库）
-            IS_FIRST_DEPLOY=false
-            if [ ! -f data/payload.db ]; then
-              echo "🆕 First time deployment detected. Will run content migration."
-              IS_FIRST_DEPLOY=true
-            fi
-
-            # 3. 加载镜像
             echo "📥 Loading Docker image..."
             docker load < shenleng-site.tar.gz
 
-            # 4. 停止并清理旧容器
             echo "🛑 Stopping old container..."
             docker stop shenleng-container || true
             docker rm shenleng-container || true
 
-            # 5. 启动新容器
             echo "🚀 Starting new container..."
+            # 简化启动逻辑：迁移逻辑已移入 Dockerfile 的 CMD
             docker run -d \
               --name shenleng-container \
               --restart unless-stopped \
@@ -76,19 +61,9 @@ jobs:
               -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
               -e DATABASE_URI="file:/app/payload.db" \
               -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
+              -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
               shenleng-site
 
-            # 6. 如果是首次部署，执行数据迁移
-            if [ "$IS_FIRST_DEPLOY" = true ]; then
-              echo "⏳ Waiting for Payload to start..."
-              sleep 10
-              echo "📦 Running content migration..."
-              # 在容器内部执行迁移脚本
-              docker exec shenleng-container npm run migrate:content
-              echo "✅ Data migration completed."
-            fi
-
-            # 清理
             rm shenleng-site.tar.gz
             docker image prune -f
             
