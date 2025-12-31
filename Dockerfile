@@ -5,7 +5,6 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
-# 使用 --legacy-peer-deps 绕过版本冲突
 RUN npm ci --legacy-peer-deps
 
 # 2. Build
@@ -22,8 +21,7 @@ ENV PAYLOAD_CONFIG_PATH=src/payload.config.ts
 # 关键：生成 importMap
 RUN npx payload generate:importmap
 
-# 修复：使用专门的初始化脚本来创建数据库表结构
-# 这比 migrate:create 更可靠，能确保 next build 静态生成时不报错
+# 修复：构建前初始化表结构，防止静态页面生成报错
 RUN npx tsx src/scripts/build-init.ts
 
 # 禁用构建检查以确保通过
@@ -44,10 +42,19 @@ RUN adduser --system --uid 1001 nextjs
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# 复制构建产物
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# 关键：复制迁移脚本所需的数据源（旧文章JSON和图片）
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+# 复制迁移脚本本身（ts文件在standalone模式下可能没被打包，需要显式复制src）
+COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
+COPY --from=builder --chown=nextjs:nodejs /app/src/payload.config.ts ./src/payload.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections
+
+# 确保媒体上传目录存在
 RUN mkdir -p public/media && chown nextjs:nodejs public/media
 
 USER nextjs
