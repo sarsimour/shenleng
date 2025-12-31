@@ -5,7 +5,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
-# 使用 --legacy-peer-deps 绕过严格的版本校验冲突
+# 使用 --legacy-peer-deps 绕过版本冲突
 RUN npm ci --legacy-peer-deps
 
 # 2. Build
@@ -19,8 +19,12 @@ ENV PAYLOAD_SECRET=build_secret_placeholder
 ENV DATABASE_URI=file:./payload-build.db
 ENV PAYLOAD_CONFIG_PATH=src/payload.config.ts
 
-# 生成 importMap
+# 关键：生成 importMap
 RUN npx payload generate:importmap
+
+# 修复：使用专门的初始化脚本来创建数据库表结构
+# 这比 migrate:create 更可靠，能确保 next build 静态生成时不报错
+RUN npx tsx src/scripts/build-init.ts
 
 # 禁用构建检查以确保通过
 ENV NEXT_IGNORE_ESLINT=1
