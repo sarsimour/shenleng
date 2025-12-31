@@ -15,6 +15,8 @@ jobs:
       - name: Build Docker Image
         run: |
           echo "🐳 Building Docker image..."
+          # 确保 package-lock.json 存在
+          npm install --package-lock-only
           docker build -t shenleng-site .
           
           echo "📦 Saving and compressing image..."

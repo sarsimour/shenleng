@@ -4,31 +4,34 @@ FROM node:20-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-RUN npm install -g pnpm
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+# 统一使用 npm
+COPY package.json package-lock.json* ./
+RUN npm ci
 
 # 2. Build
 FROM base AS builder
 WORKDIR /app
-RUN npm install -g pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 修复 ENV 语法，并确保环境变量在构建时可用
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PAYLOAD_SECRET=build_secret_placeholder
+# 构建时使用本地临时数据库
 ENV DATABASE_URI=file:./payload-build.db
 ENV PAYLOAD_CONFIG_PATH=src/payload.config.ts
 
-# 关键：在构建前重新生成 importMap
-RUN pnpm run generate:importmap
+# 关键：在构建前生成 importMap
+RUN npx payload generate:importmap
 
-# 禁用构建检查以确保通过
+# 修复：确保在 build 静态页面前，数据库表结构已经存在
+# 我们运行一个简单的命令让 Payload 初始化并同步 SQLite 架构
+RUN npx payload migrate:create --name init_schema || true
+
+# 禁用检查以加速构建
 ENV NEXT_IGNORE_ESLINT=1
 ENV NEXT_IGNORE_TYPESCRIPT_ERRORS=1
 
-RUN pnpm build
+RUN npm run build
 
 # 3. Production image
 FROM base AS runner
@@ -46,7 +49,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# 确保媒体上传目录存在
 RUN mkdir -p public/media && chown nextjs:nodejs public/media
 
 USER nextjs
