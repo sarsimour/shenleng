@@ -57,6 +57,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections
 # 确保媒体上传目录存在
 RUN mkdir -p public/media && chown nextjs:nodejs public/media
 
+# 全局安装 tsx，确保迁移脚本可以运行
+RUN npm install -g tsx
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
