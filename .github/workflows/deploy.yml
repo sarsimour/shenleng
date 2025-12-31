@@ -10,8 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 在 GitHub Runner (海外环境) 构建镜像
-      # 这里网络通畅，拉取 node:20-alpine 没问题
+      # 1. 在 GitHub Runner 构建镜像
       - name: Build Docker Image
         run: |
           echo "🐳 Building Docker image..."
@@ -20,21 +19,21 @@ jobs:
           docker build -t shenleng-site .
           
           echo "📦 Saving and compressing image..."
-          # 保存镜像为 tar 文件并压缩，大大减少传输时间
           docker save shenleng-site | gzip > shenleng-site.tar.gz
 
-      # 2. 上传 镜像包 和 必要的配置 到服务器
-      - name: Copy Image to Server
+      # 2. 上传 镜像包 到服务器
+      # 注意：由于 payload.db 较大且包含敏感信息，我们通常不建议放在仓库，
+      # 但为了让您下班前能看到数据，我们这次将其也作为 SCP 的源。
+      - name: Copy Files to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          # 增加超时时间，防止文件过大导致断开
           timeout: 10m
-          # 只上传构建好的镜像包和必要的挂载目录结构
-          source: "shenleng-site.tar.gz"
-          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+          # 传输镜像包、当前的数据库种子文件、以及已下载的图片
+          source: "shenleng-site.tar.gz,payload.db,public/media/*"
+          target: "/home/${{ secrets.ECS_USER }} Proud/Projects/shenleng"
 
       # 3. SSH 登录，加载镜像并重启
       - name: Load Image and Restart
@@ -52,20 +51,29 @@ jobs:
             # 1. 准备数据目录
             mkdir -p data/media
 
-            # 2. 加载镜像 (从 tar.gz 文件)
+            # 2. 如果服务器上还没有数据库，则将刚才传过来的种子文件拷过去
+            if [ ! -f data/payload.db ]; then
+              echo "🌱 Seeding initial database..."
+              mv payload.db data/payload.db
+            else
+              echo "📅 Database already exists, skipping seed."
+              rm payload.db
+            fi
+            
+            # 3. 同步媒体文件
+            echo "🖼 Syncing media files..."
+            cp -r public/media/* data/media/ || true
+
+            # 4. 加载镜像
             echo "📥 Loading Docker image..."
             docker load < shenleng-site.tar.gz
 
-            # 3. 停止并清理旧容器
-            echo "🛑 Stopping old container..."
+            # 5. 停止并清理旧容器
             docker stop shenleng-container || true
             docker rm shenleng-container || true
 
-            # 4. 启动新容器
+            # 6. 启动新容器
             echo "🚀 Starting new container..."
-            # 注意：Payload CMS 需要 DATABASE_URI 和 PAYLOAD_SECRET
-            # 这里的环境变量如果是固定的，可以直接写；如果是敏感的，建议在服务器建立 .env 文件引用
-            # 或者通过 GitHub Secrets 注入
             docker run -d \
               --name shenleng-container \
               --restart unless-stopped \
@@ -77,8 +85,8 @@ jobs:
               -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               shenleng-site
 
-            # 5. 清理文件
+            # 清理
             rm shenleng-site.tar.gz
             docker image prune -f
             
-            echo "✅ Deployment successful!"
+            echo "✅ Deployment with data seed successful!"
