@@ -10,12 +10,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 在 GitHub Runner 构建镜像
+      # 1. 在 GitHub Runner (海外环境) 构建镜像
+      # 这里网络通畅，拉取 node:20-alpine 没问题
       - name: Build Docker Image
         run: |
           echo "🐳 Building Docker image..."
           # 确保 package-lock.json 存在
-          npm install --package-lock-only
+          npm install --package-lock-only --legacy-peer-deps
           docker build -t shenleng-site .
           
           echo "📦 Saving and compressing image..."

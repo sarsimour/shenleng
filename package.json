@@ -23,8 +23,8 @@
     "next": "15.4.10",
     "nodemailer": "^7.0.12",
     "payload": "^3.69.0",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.0.1",
+    "react-dom": "19.0.1",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0"
   },
