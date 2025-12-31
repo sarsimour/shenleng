@@ -15,6 +15,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PAYLOAD_SECRET=build_secret_placeholder
+# 构建时使用临时库
 ENV DATABASE_URI=file:./payload-build.db
 ENV PAYLOAD_CONFIG_PATH=src/payload.config.ts
 
@@ -32,31 +33,34 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# 保持使用 root 以避免权限问题
+# RUN addgroup --system --gid 1001 nodejs
+# RUN adduser --system --uid 1001 nextjs
 
 RUN mkdir .next
-# 关键：确保 nextjs 用户对 /app 有完全控制权，以便创建和写入数据库文件
-RUN chown -R nextjs:nodejs /app
 
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/data ./data
-COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
-COPY --from=builder --chown=nextjs:nodejs /app/src/payload.config.ts ./src/payload.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/data ./data
+COPY --from=builder /app/src/scripts ./src/scripts
+COPY --from=builder /app/src/payload.config.ts ./src/payload.config.ts
+COPY --from=builder /app/src/collections ./src/collections
 
-# RUN mkdir -p public/media && chown nextjs:nodejs public/media
+# 创建数据库挂载点
+RUN mkdir -p database
+RUN mkdir -p public/media
 
-# 全局安装 tsx
 RUN npm install -g tsx
 
-# 暂时切换回 root 以彻底解决 SQLite 挂载卷的权限问题
-# USER nextjs
 EXPOSE 3000
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# 关键：启动时先尝试迁移，再运行应用。使用 && 确保顺序执行。
-CMD ["sh", "-c", "if [ ! -f /app/payload.db ]; then npm run migrate:content; fi && npm start"]
+# 使用 entrypoint 脚本管理启动逻辑
+COPY --from=builder /app/src/scripts/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["npm", "start"]

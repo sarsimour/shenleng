@@ -41,25 +41,30 @@ jobs:
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
 
+            # 1. 准备数据持久化目录
             mkdir -p data/media
+            mkdir -p data/db # 新增数据库目录
 
+            # 2. 加载镜像
             echo "📥 Loading Docker image..."
             docker load < shenleng-site.tar.gz
 
+            # 3. 停止旧容器
             echo "🛑 Stopping old container..."
             docker stop shenleng-container || true
             docker rm shenleng-container || true
 
+            # 4. 启动新容器
+            # 关键修正：挂载整个 db 目录，解决 SQLite 锁文件创建失败的问题
             echo "🚀 Starting new container..."
-            # 简化启动逻辑：迁移逻辑已移入 Dockerfile 的 CMD
             docker run -d \
               --name shenleng-container \
               --restart unless-stopped \
               -p 3000:3000 \
-              -v $(pwd)/data/payload.db:/app/payload.db \
+              -v $(pwd)/data/db:/app/database \
               -v $(pwd)/data/media:/app/public/media \
               -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
-              -e DATABASE_URI="file:/app/payload.db" \
+              -e DATABASE_URI="file:/app/database/payload.db" \
               -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
               shenleng-site
