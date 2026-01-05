@@ -38,12 +38,12 @@ RUN adduser --system --uid 1001 nextjs
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
-# 复制全量文件以支持迁移脚本运行
+# 复制全量文件
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+# COPY --from=builder --chown=nextjs:nodejs /app/data ./data # 移除：数据通过挂载
 COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
 COPY --from=builder --chown=nextjs:nodejs /app/src/payload.config.ts ./src/payload.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections

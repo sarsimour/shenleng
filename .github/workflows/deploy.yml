@@ -15,8 +15,7 @@ jobs:
           echo "🐳 Building Docker image..."
           npm install --package-lock-only --legacy-peer-deps
           docker build -t shenleng-site .
-          
-          echo "📦 Saving and compressing image..."
+          echo "📦 Compressing image..."
           docker save shenleng-site | gzip > shenleng-site.tar.gz
 
       - name: Copy Image to Server
@@ -39,35 +38,46 @@ jobs:
           script: |
             set -e
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            DATA_SOURCE_DIR="/home/${{ secrets.ECS_USER }}/shenleng_data_source"
             cd "$PROJECT_DIR"
 
-            # 1. 准备目录并修正权限
-            echo "🔧 Preparing directories..."
-            mkdir -p data/db
-            mkdir -p data/media
+            # 1. 准备持久化目录 (使用新目录名 persistence，避免与旧目录权限冲突)
+            echo "🔧 Preparing persistence directories..."
+            mkdir -p persistence/sqlite
+            mkdir -p persistence/media
             
-            # 暴力但有效：给予 data 目录完全写权限
-            # 这确保了容器内的 nextjs 用户(1001)绝对可以写入宿主机目录
-            # 解决了 ConnectionFailed: 14 和 SQLITE_CANTOPEN 问题
-            chmod -R 777 data
+            # 关键修复：使用 Docker 容器以 Root 身份修改宿主机目录权限
+            # 这绕过了 ECS_USER 无法 chmod root 文件的限制
+            echo "🔧 Fixing permissions using Docker..."
+            docker run --rm -v $(pwd)/persistence:/target alpine chmod -R 777 /target
 
             # 2. 加载镜像
             echo "📥 Loading Docker image..."
             docker load < shenleng-site.tar.gz
 
-            # 3. 检查并执行一次性迁移 (使用临时容器)
-            # 只有当 payload.db 不存在时才执行
-            if [ ! -f data/db/payload.db ]; then
-              echo "🆕 Database not found. Running initialization migration..."
-              docker run --rm \
-                -v $(pwd)/data/db:/app/database \
-                -v $(pwd)/data/media:/app/public/media \
-                -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
-                -e DATABASE_URI="file:/app/database/payload.db" \
-                -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
-                shenleng-site \
-                npm run migrate:content
-              echo "✅ Migration completed."
+            # 3. 检查并执行一次性迁移 (Init Container)
+            if [ ! -f persistence/sqlite/payload.db ]; then
+              if [ -d "$DATA_SOURCE_DIR" ]; then
+                echo "🆕 Database not found and data source detected. Running initialization migration..."
+                
+                # 再次确保数据源可读（可选）
+                docker run --rm -v "$DATA_SOURCE_DIR":/target alpine chmod -R 777 /target
+
+                docker run --rm \
+                  -v $(pwd)/persistence/sqlite:/app/database \
+                  -v $(pwd)/persistence/media:/app/public/media \
+                  -v "$DATA_SOURCE_DIR":/app/migration_source \
+                  -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
+                  -e DATABASE_URI="file:/app/database/payload.db" \
+                  -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
+                  -e MIGRATION_SOURCE_DIR="/app/migration_source" \
+                  shenleng-site \
+                  npm run migrate:content
+                  
+                echo "✅ Migration completed."
+              else
+                echo "⚠️ Database not found, but data source ($DATA_SOURCE_DIR) is missing. Skipping migration."
+              fi
             else
               echo "📅 Database exists. Skipping migration."
             fi
@@ -81,16 +91,14 @@ jobs:
               --name shenleng-container \
               --restart unless-stopped \
               -p 3000:3000 \
-              -v $(pwd)/data/db:/app/database \
-              -v $(pwd)/data/media:/app/public/media \
+              -v $(pwd)/persistence/sqlite:/app/database \
+              -v $(pwd)/persistence/media:/app/public/media \
               -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
               -e DATABASE_URI="file:/app/database/payload.db" \
               -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
               -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               shenleng-site
 
-            # 清理
             rm shenleng-site.tar.gz
             docker image prune -f
-            
             echo "✅ Deployment successful!"
