@@ -8,11 +8,13 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const DATA_DIR = path.resolve(__dirname, '../../data/nextjs_content/content/json')
-const IMAGES_DIR = path.resolve(__dirname, '../../data/nextjs_content/public/images')
-const REDIRECTS_DIR = path.resolve(__dirname, '../../redirects')
+const IMAGES_DIR = path.join(DATA_DIR, 'public/images')
 
-async function migrate() {
-  const payload = await getPayload({ config })
+// 将输出目录改为 /tmp，避免在 Docker 容器根目录创建文件夹时出现权限问题
+// 之前的 '../../redirects' 位于 /app/redirects，非 root 用户无法写入
+const REDIRECTS_DIR = process.env.REDIRECTS_OUTPUT_DIR || '/tmp'
+
+const payload = await getPayload({ config })
 
   // 1. 确保重定向目录存在
   if (!fs.existsSync(REDIRECTS_DIR)) {
