@@ -40,6 +40,7 @@ export default buildConfig({
     client: {
       url: process.env.DATABASE_URI || 'file:./database/payload.db',
     },
+    push: true, // 关键：强制 Payload 在启动时同步数据库表结构
   }),
   sharp,
 })
