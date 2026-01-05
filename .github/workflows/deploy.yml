@@ -41,22 +41,42 @@ jobs:
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
 
-            # 1. 准备数据持久化目录
+            # 1. 准备目录并修正权限
+            echo "🔧 Preparing directories..."
+            mkdir -p data/db
             mkdir -p data/media
-            mkdir -p data/db # 新增数据库目录
+            
+            # 暴力但有效：给予 data 目录完全写权限
+            # 这确保了容器内的 nextjs 用户(1001)绝对可以写入宿主机目录
+            # 解决了 ConnectionFailed: 14 和 SQLITE_CANTOPEN 问题
+            chmod -R 777 data
 
             # 2. 加载镜像
             echo "📥 Loading Docker image..."
             docker load < shenleng-site.tar.gz
 
-            # 3. 停止旧容器
-            echo "🛑 Stopping old container..."
+            # 3. 检查并执行一次性迁移 (使用临时容器)
+            # 只有当 payload.db 不存在时才执行
+            if [ ! -f data/db/payload.db ]; then
+              echo "🆕 Database not found. Running initialization migration..."
+              docker run --rm \
+                -v $(pwd)/data/db:/app/database \
+                -v $(pwd)/data/media:/app/public/media \
+                -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
+                -e DATABASE_URI="file:/app/database/payload.db" \
+                -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
+                shenleng-site \
+                npm run migrate:content
+              echo "✅ Migration completed."
+            else
+              echo "📅 Database exists. Skipping migration."
+            fi
+
+            # 4. 启动主服务
+            echo "🚀 Starting main container..."
             docker stop shenleng-container || true
             docker rm shenleng-container || true
-
-            # 4. 启动新容器
-            # 关键修正：挂载整个 db 目录，解决 SQLite 锁文件创建失败的问题
-            echo "🚀 Starting new container..."
+            
             docker run -d \
               --name shenleng-container \
               --restart unless-stopped \
@@ -65,10 +85,11 @@ jobs:
               -v $(pwd)/data/media:/app/public/media \
               -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
               -e DATABASE_URI="file:/app/database/payload.db" \
-              -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
+              -e NEXT_PUBLIC_SERVER_URL="https://www.finverse.top" \
               shenleng-site
 
+            # 清理
             rm shenleng-site.tar.gz
             docker image prune -f
             
