@@ -21,7 +21,25 @@ const payload = await getPayload({ config })
     fs.mkdirSync(REDIRECTS_DIR)
   }
 
-  const jsonFiles = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json'))
+  // 0. 创建默认管理员
+  try {
+    const existingUsers = await payload.find({ collection: 'users', limit: 1 })
+    if (existingUsers.totalDocs === 0) {
+      console.log('创建默认管理员账户...')
+      await payload.create({
+        collection: 'users',
+        data: {
+          email: 'admin@shenleng.com',
+          password: 'shenleng2026',
+        },
+      })
+    }
+  } catch (e) {
+    console.warn('跳过管理员创建（可能已存在）')
+  }
+
+  // 1. 遍历文章目录
+  const files = fs.readdirSync(ARTICLES_DIR).filter((file) => file.endsWith('.json'))
   console.log(`找到 ${jsonFiles.length} 个文章文件待迁移...`)
 
   const urlMap: Record<string, string> = {}
@@ -72,6 +90,7 @@ const payload = await getPayload({ config })
           coverImage: coverImageId,
           baseViews: data.views || 0,
           publishedAt: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+          _status: 'published', // 关键：确保文章默认为发布状态，否则前端不可见
           // 必须包含 content 字段（富文本），否则可能验证失败
           content: {
             root: {
