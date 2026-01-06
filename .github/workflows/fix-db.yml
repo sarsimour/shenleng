@@ -1,0 +1,52 @@
+name: Fix Database
+
+on:
+  workflow_dispatch: # 手动触发
+
+jobs:
+  fix-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Initial Database
+        run: |
+          # 运行初始化脚本生成 payload-local-init.db
+          npx tsx scripts/init_local_db.ts
+          mv payload-local-init.db payload.db
+        env:
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+
+      - name: Upload Database to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 10m
+          source: "payload.db"
+          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng/persistence/sqlite"
+          # 使用 strip_components 确保文件直接放在 sqlite 目录下，而不是再套一层目录
+          strip_components: 0 
+
+      - name: Restart Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 10m
+          script: |
+            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            cd "$PROJECT_DIR"
+            
+            echo "🔄 Restarting container to pick up new database..."
+            docker restart shenleng-container
