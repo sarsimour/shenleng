@@ -32,30 +32,29 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 使用 ecs_user 匹配服务器用户 (UID 1000 是大多数云服务器默认用户的 ID)
-RUN addgroup --system --gid 1000 ecs_group
-RUN adduser --system --uid 1000 --ingroup ecs_group ecs_user
+# 基础镜像 node:20-alpine 已经包含 UID/GID 为 1000 的 'node' 用户
+# 直接使用它来匹配宿主机的 UID 1000
 
 RUN mkdir .next
-RUN chown ecs_user:ecs_group .next
+RUN chown node:node .next
 
 # 复制全量文件
-COPY --from=builder --chown=ecs_user:ecs_group /app/node_modules ./node_modules
-COPY --from=builder --chown=ecs_user:ecs_group /app/.next ./.next
-COPY --from=builder --chown=ecs_user:ecs_group /app/public ./public
-COPY --from=builder --chown=ecs_user:ecs_group /app/package.json ./package.json
-COPY --from=builder --chown=ecs_user:ecs_group /app/src/scripts ./src/scripts
-COPY --from=builder --chown=ecs_user:ecs_group /app/src/payload.config.ts ./src/payload.config.ts
-COPY --from=builder --chown=ecs_user:ecs_group /app/src/collections ./src/collections
-COPY --from=builder --chown=ecs_user:ecs_group /app/next.config.ts ./next.config.ts
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/.next ./.next
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/src/scripts ./src/scripts
+COPY --from=builder --chown=node:node /app/src/payload.config.ts ./src/payload.config.ts
+COPY --from=builder --chown=node:node /app/src/collections ./src/collections
+COPY --from=builder --chown=node:node /app/next.config.ts ./next.config.ts
 
 # 创建挂载点
-RUN mkdir -p database && chown ecs_user:ecs_group database
-RUN mkdir -p public/media && chown ecs_user:ecs_group public/media
+RUN mkdir -p database && chown node:node database
+RUN mkdir -p public/media && chown node:node public/media
 
 RUN npm install -g tsx
 
-USER ecs_user
+USER node
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
