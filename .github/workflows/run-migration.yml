@@ -1,0 +1,59 @@
+name: Run Content Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. 上传数据文件 (排除不需要的大文件如果可能，但这里直接传整个目录)
+      - name: Upload Data to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 30m
+          source: "data/nextjs_content"
+          target: "/home/${{ secrets.ECS_USER }}/temp_migration_source"
+
+      # 2. 运行迁移脚本
+      - name: Execute Migration in Docker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 30m
+          script: |
+            SOURCE_DIR="/home/${{ secrets.ECS_USER }}/temp_migration_source/data/nextjs_content"
+            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            
+            echo "📂 Data source: $SOURCE_DIR"
+            
+            # 确保数据目录权限可读
+            # 因为 Docker 里是 node 用户 (uid 1000)，确保它能读取映射进来的文件
+            chmod -R 755 /home/${{ secrets.ECS_USER }}/temp_migration_source
+            
+            echo "🚀 Starting migration container..."
+            
+            # 使用与生产环境相同的镜像
+            docker run --rm \
+              --user node \
+              -v "$PROJECT_DIR/persistence/sqlite":/app/database \
+              -v "$PROJECT_DIR/persistence/media":/app/public/media \
+              -v "$SOURCE_DIR":/app/migration_data \
+              -e PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}" \
+              -e DATABASE_URI="file:/app/database/payload.db" \
+              -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
+              -e MIGRATION_DATA_DIR="/app/migration_data" \
+              shenleng-site:latest \
+              npx tsx scripts/migrate_server_local.ts
+
+            echo "✅ Migration finished."
+            
+            # 清理
+            rm -rf /home/${{ secrets.ECS_USER }}/temp_migration_source
