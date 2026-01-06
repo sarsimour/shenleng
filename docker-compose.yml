@@ -1,0 +1,16 @@
+services:
+  web:
+    container_name: shenleng-container
+    image: shenleng-site:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./persistence/sqlite:/app/database
+      - ./persistence/media:/app/public/media
+    environment:
+      - NODE_ENV=production
+      - PAYLOAD_SECRET=${PAYLOAD_SECRET}
+      - DATABASE_URI=file:/app/database/payload.db
+      - PAYLOAD_CONFIG_PATH=src/payload.config.ts
+      - PORT=3000

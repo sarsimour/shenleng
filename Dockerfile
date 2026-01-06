@@ -32,29 +32,30 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# 使用 ecs_user 匹配服务器用户 (UID 1000 是大多数云服务器默认用户的 ID)
+RUN addgroup --system --gid 1000 ecs_group
+RUN adduser --system --uid 1000 --ingroup ecs_group ecs_user
 
 RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN chown ecs_user:ecs_group .next
 
 # 复制全量文件
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-# COPY --from=builder --chown=nextjs:nodejs /app/data ./data # 移除：数据通过挂载
-COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
-COPY --from=builder --chown=nextjs:nodejs /app/src/payload.config.ts ./src/payload.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/src/collections ./src/collections
+COPY --from=builder --chown=ecs_user:ecs_group /app/node_modules ./node_modules
+COPY --from=builder --chown=ecs_user:ecs_group /app/.next ./.next
+COPY --from=builder --chown=ecs_user:ecs_group /app/public ./public
+COPY --from=builder --chown=ecs_user:ecs_group /app/package.json ./package.json
+COPY --from=builder --chown=ecs_user:ecs_group /app/src/scripts ./src/scripts
+COPY --from=builder --chown=ecs_user:ecs_group /app/src/payload.config.ts ./src/payload.config.ts
+COPY --from=builder --chown=ecs_user:ecs_group /app/src/collections ./src/collections
+COPY --from=builder --chown=ecs_user:ecs_group /app/next.config.ts ./next.config.ts
 
 # 创建挂载点
-RUN mkdir -p database && chown nextjs:nodejs database
-RUN mkdir -p public/media && chown nextjs:nodejs public/media
+RUN mkdir -p database && chown ecs_user:ecs_group database
+RUN mkdir -p public/media && chown ecs_user:ecs_group public/media
 
 RUN npm install -g tsx
 
-USER nextjs
+USER ecs_user
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
