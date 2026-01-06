@@ -1,6 +1,5 @@
 
 import { getPayload } from 'payload'
-import configPromise from '../src/payload.config'
 import fs from 'fs'
 import path from 'path'
 
@@ -12,6 +11,9 @@ process.env.PAYLOAD_SECRET = 'init-secret'
 
 async function main() {
   console.log('🚀 初始化本地数据库用于部署...')
+  
+  // 动态导入配置，确保环境变量已生效
+  const { default: configPromise } = await import('../src/payload.config')
   
   if (fs.existsSync(DB_PATH)) {
     console.log('🗑️ 删除旧的初始化数据库文件...')
