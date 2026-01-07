@@ -1,4 +1,4 @@
-name: Deploy Shenleng Site
+name: Deploy Shenleng (Bare Metal)
 
 on:
   push:
@@ -10,71 +10,89 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        run: |
-          echo "🐳 Building Docker image..."
-          # 确保依赖安装
-          npm install --package-lock-only --legacy-peer-deps
-          
-          # 构建镜像
-          docker build -t shenleng-site:latest .
-          
-          echo "📦 Compressing image..."
-          docker save shenleng-site:latest | gzip > shenleng-site.tar.gz
-
+      # 1. 传输所有代码文件到服务器
       - name: Copy Files to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 10m
-          source: "shenleng-site.tar.gz,docker-compose.yml"
+          timeout: 20m
+          source: "."
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+          # 排除 .git 和 node_modules (太大)
+          rm: true 
 
-      - name: Deploy on Server
+      # 2. 在服务器上执行构建和启动
+      - name: Setup & Start Application
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 10m
+          timeout: 30m
+          # 传递环境变量
           envs: PAYLOAD_SECRET
           script: |
-            set -e
-            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-            cd "$PROJECT_DIR"
-
-            echo "📂 Ensuring directory structure..."
-            # 创建持久化目录
-            mkdir -p persistence/sqlite
-            mkdir -p persistence/media
+            export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
+            export NODE_ENV=production
+            export PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             
-            # 确保当前用户拥有这些目录的所有权 (针对之前可能被 root 篡改过的权限)
-            # 使用 sudo 是为了修复可能存在的旧权限问题，如果 ecs_user 没有 sudo 权限，这行可能会失败
-            # 如果失败，通常意味着已经是 ecs_user 所有的，或者无权修改。
-            # 为了安全起见，我们尝试使用 docker 这种 trick 来修复权限，或者假设之前的问题已解决。
-            # 既然之前的 workflow 用了 docker fix，我们保留这个 trick 作为保险，但改为 chown 给 uid 1000
-            
-            echo "🔧 Ensuring permissions match UID 1000..."
-            docker run --rm -v $(pwd)/persistence:/target alpine chown -R 1000:1000 /target
-
-            echo "📥 Loading Docker image..."
-            docker load < shenleng-site.tar.gz
-
-            echo "🚀 Starting service with Docker Compose..."
-            # 创建 .env 文件供 docker-compose 使用
-            echo "PAYLOAD_SECRET=${{ secrets.PAYLOAD_SECRET }}" > .env
-            
-            # 停止旧容器 (兼容旧的 docker run 方式启动的容器)
+            # --- 0. 停止旧的 Docker 容器 (如果存在) ---
+            echo "🛑 Stopping any legacy Docker containers..."
             docker stop shenleng-container || true
             docker rm shenleng-container || true
-            
-            # 启动新服务
-            docker compose up -d --remove-orphans
 
-            # 清理
-            rm shenleng-site.tar.gz
-            docker image prune -f
+            # --- 1. 环境准备 (安装 NVM 和 Node 20) ---
+            echo "🔧 Checking Node.js environment..."
+            if ! command -v node &> /dev/null; then
+                echo "Installing NVM and Node.js..."
+                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                export NVM_DIR="$HOME/.nvm"
+                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                nvm install 20
+                nvm use 20
+                nvm alias default 20
+            else
+                export NVM_DIR="$HOME/.nvm"
+                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                nvm use 20 || nvm install 20
+            fi
+
+            # 安装全局 PM2
+            if ! command -v pm2 &> /dev/null; then
+                npm install -g pm2
+            fi
+
+            # --- 2. 依赖安装与构建 ---
+            cd "$PROJECT_DIR"
+            echo "📦 Installing dependencies..."
+            # 强制安装 sharp 的 linux x64 版本，避免 MacOS 上传后的兼容性问题
+            npm install --platform=linux --arch=x64 sharp
+            npm install --legacy-peer-deps
+
+            echo "🏗️ Building application..."
+            # 确保环境变量存在
+            echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
+            echo "DATABASE_URI=file:./payload.db" >> .env
             
-            echo "✅ Deployment successful!"
+            npm run build
+
+            # --- 3. 启动服务 (PM2) ---
+            echo "🚀 Starting application with PM2..."
+            # 如果进程已存在，重载它；否则启动它
+            if pm2 list | grep -q "shenleng"; then
+                pm2 reload shenleng
+            else
+                pm2 start npm --name "shenleng" -- start -- --port 3000
+            fi
+            
+            # 保存 PM2 列表，确保开机自启 (需要 sudo 权限执行 pm2 startup，这里尽力而为)
+            pm2 save
+
+            # --- 4. Nginx 配置提示 ---
+            echo "🌐 Nginx configuration reminder:"
+            echo "Please ensure /etc/nginx/sites-enabled/shenleng exists and points to $PROJECT_DIR/nginx.conf"
+            echo "You might need to run: sudo ln -sf $PROJECT_DIR/nginx.conf /etc/nginx/sites-enabled/shenleng && sudo nginx -s reload"
+            
+            echo "✅ Deployment Complete!"
