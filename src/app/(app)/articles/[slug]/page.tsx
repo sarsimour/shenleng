@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { getPayload } from "payload";
 import config from "@/payload.config";
 
+export const dynamic = 'force-dynamic';
+
 async function getArticleData(slug: string) {
   const payload = await getPayload({ config });
   const result = await payload.find({

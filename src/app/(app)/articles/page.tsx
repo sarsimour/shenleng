@@ -5,6 +5,8 @@ import { Calendar, ArrowRight, Clock } from "lucide-react";
 import { getPayload } from "payload";
 import config from "@/payload.config";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "行业洞察与公司动态 - 申冷物流",
   description: "申冷物流发布的最新行业分析、冷链知识与公司新闻。",

@@ -4,6 +4,8 @@ import ValueProp from "@/components/sections/ValueProp";
 import Trust from "@/components/sections/Trust";
 import News from "@/components/sections/News";
 
+export const dynamic = 'force-dynamic';
+
 export default function Home() {
   return (
     <>
