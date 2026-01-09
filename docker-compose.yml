@@ -1,26 +1,22 @@
 services:
   web:
     container_name: shenleng-container
-    image: shenleng-site:latest
+    image: ghcr.io/sarsimour/shenleng:latest
     restart: unless-stopped
-    # 核心设置：强制容器以 UID 1000 运行
-    # 这要求宿主机上的 ./persistence 和 ./data 目录必须归 UID 1000 所有
     user: "1000:1000"
     ports:
       - "3000:3000"
     volumes:
-      # 1. 数据库文件 (读写)
-      - ./persistence/sqlite:/app/database
-      # 2. 媒体上传目录 (读写)
-      - ./persistence/media:/app/public/media
-      # 3. 原始文章数据源 (只读，用于迁移)
-      - ./data/nextjs_content:/app/migration_data:ro
+      # 数据库持久化
+      - ~/data/shenleng/persistence/sqlite:/app/database
+      # 媒体文件持久化
+      - ~/data/shenleng/persistence/media:/app/public/media
+      # 原始数据源 (只读)
+      - ~/data/shenleng/migration_source:/app/migration_data:ro
     environment:
       - NODE_ENV=production
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
-      # 告诉 Payload 数据库在哪里
       - DATABASE_URI=file:/app/database/payload.db
       - PAYLOAD_CONFIG_PATH=src/payload.config.ts
       - PORT=3000
-      # 告诉迁移脚本数据源在哪里
       - MIGRATION_DATA_DIR=/app/migration_data

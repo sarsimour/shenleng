@@ -1,4 +1,4 @@
-name: Run Migration (Direct)
+name: Run Migration (Docker)
 
 on:
   workflow_dispatch:
@@ -7,8 +7,7 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      # 1. 直接在服务器上执行，不需要上传代码（假设 deploy 已经把代码传上去了）
-      - name: Execute Migration on Server
+      - name: Execute Migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ECS_HOST }}
@@ -18,18 +17,28 @@ jobs:
           envs: PAYLOAD_SECRET
           script: |
             export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
-            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             
-            cd "$PROJECT_DIR"
+            echo "🛑 Stopping web container..."
+            docker stop shenleng-container || true
             
-            echo "🛑 Stopping application to release DB lock..."
-            pm2 stop shenleng || true
+            echo "📥 Pulling latest image..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/sarsimour/shenleng:latest
             
-            echo "🚀 Running migration script..."
-            # 使用项目本地的 npx 和 tsx
-            npx tsx scripts/migrate_server_local.ts
+            echo "🚀 Running migration container..."
+            docker run --rm \
+                --user "1000:1000" \
+                -v ~/data/shenleng/persistence/sqlite:/app/database \
+                -v ~/data/shenleng/persistence/media:/app/public/media \
+                -v ~/data/shenleng/migration_source:/app/migration_data \
+                -e PAYLOAD_SECRET="$PAYLOAD_SECRET" \
+                -e DATABASE_URI="file:/app/database/payload.db" \
+                -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \
+                -e MIGRATION_DATA_DIR="/app/migration_data" \
+                ghcr.io/sarsimour/shenleng:latest \
+                npx tsx src/scripts/migrate_server_local.ts
             
-            echo "▶️ Restarting application..."
-            pm2 start shenleng || pm2 restart shenleng
+            echo "▶️ Restarting web container..."
+            cd ~/Projects/shenleng && docker compose up -d
             
-            echo "✅ Done!"
+            echo "✅ Migration Complete!"
