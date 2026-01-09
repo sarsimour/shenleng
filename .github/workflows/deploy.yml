@@ -1,33 +1,54 @@
-name: Deploy Shenleng (Docker)
+name: Deploy Shenleng (Docker + GHCR)
 
 on:
   push:
     branches: ["master"]
 
+env:
+  # 镜像地址: ghcr.io/用户名/仓库名:latest
+  # ⚠️ 注意: GHCR 要求用户名和仓库名必须小写
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/sarsimour/shenleng:latest
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # 允许上传镜像到 GHCR
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        run: |
-          echo "🐳 Building Docker image..."
-          npm install --package-lock-only --legacy-peer-deps
-          docker build -t shenleng-site:latest .
-          docker save shenleng-site:latest | gzip > shenleng-site.tar.gz
+      # 1. 登录 GitHub Container Registry
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Copy Files to Server
+      # 2. 构建并推送镜像 (不再生成 tar 包)
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}
+
+      # 3. 传输数据和配置 (排除大镜像文件)
+      - name: Copy Config & Data to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 30m
-          # 将原始数据也一并传上去，放在项目目录下
-          source: "shenleng-site.tar.gz,docker-compose.yml,nginx.conf,data/nextjs_content"
+          # 只传配置
+          source: "docker-compose.yml,nginx.conf"
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
 
+      # 4. 服务器部署
       - name: Deploy on Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -35,42 +56,48 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 20m
-          envs: PAYLOAD_SECRET
+          # 将 GITHUB_TOKEN 传给服务器用于拉取镜像
+          envs: PAYLOAD_SECRET, IMAGE_NAME, REGISTRY
           script: |
             export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" 
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
-            
+
             # 停止旧服务
-            # 如果之前有裸金属部署的 PM2，先杀掉
-            if command -v pm2 &> /dev/null; then pm2 delete shenleng || true; fi
             docker compose down || true
 
-            # 创建目录
+            # 准备目录
             mkdir -p persistence/sqlite
             mkdir -p persistence/media
             
-            # 提示用户权限
-            echo "⚠️  REMINDER: Please ensure 'persistence' and 'data/nextjs_content' are owned by UID 1000"
-            echo "⚠️  Run: sudo chown -R 1000:1000 persistence/ data/nextjs_content"
+            # 提示权限设置 (重要!)
+            echo "🔧 Ensuring permissions..."
+            # 尝试自动修复 (如果 sudo 免密)
+            if sudo -n true 2>/dev/null; then
+              sudo chown -R 1000:1000 persistence/
+              sudo chmod -R 755 data/nextjs_content
+            else
+              echo "⚠️ Please run: sudo chown -R 1000:1000 ~/Projects/shenleng/persistence"
+            fi
 
-            # 导入镜像
-            echo "📥 Loading image..."
-            docker load < shenleng-site.tar.gz
+            # 登录 GHCR 并拉取最新镜像
+            echo "📥 Pulling image from GHCR..."
+            # 使用临时的 PAT 或直接公开包。这里尝试用 GITHUB_TOKEN 登录 (有时受限于 IP)
+            # 如果失败，请将该 Package 在 GitHub 页面设为 Public
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.IMAGE_NAME }}
+
+            # 更新 docker-compose 中的镜像名
+            # 使用 sed 替换 image: shenleng-site:latest -> image: ghcr.io/...
+            sed -i "s|image: .*|image: ${{ env.IMAGE_NAME }}|g" docker-compose.yml
 
             # 启动服务
-            echo "🚀 Starting service..."
             echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
             docker compose up -d --remove-orphans
 
-            # Nginx 重载
-            # 尝试自动链接
-            if [ ! -L /etc/nginx/sites-enabled/shenleng ]; then
-               sudo ln -sf "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-enabled/shenleng
-            fi
-            sudo nginx -t && sudo nginx -s reload
+            # Nginx 刷新
+            sudo nginx -s reload || true
 
-            # 清理
-            rm shenleng-site.tar.gz
+            # 清理旧镜像
             docker image prune -f
-            echo "✅ Deployment successful!"
