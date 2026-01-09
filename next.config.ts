@@ -4,7 +4,7 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   // Docker 部署必须：生成独立的最小化运行包
-  // output: "standalone", // 暂时关闭 standalone，改用全量镜像以修复迁移脚本缺包问题
+  output: "standalone", 
   
   // 必须：排除构建时不需要打包的二进制依赖
   serverExternalPackages: ['payload', 'sharp'],
