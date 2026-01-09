@@ -3,14 +3,20 @@ services:
     container_name: shenleng-container
     image: shenleng-site:latest
     restart: unless-stopped
+    user: "1000:1000"
     ports:
       - "3000:3000"
     volumes:
+      # 1. 数据库持久化
       - ./persistence/sqlite:/app/database
+      # 2. 媒体文件持久化
       - ./persistence/media:/app/public/media
+      # 3. 原始数据源 (只读挂载)
+      - ./data/nextjs_content:/app/migration_data:ro
     environment:
       - NODE_ENV=production
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - DATABASE_URI=file:/app/database/payload.db
       - PAYLOAD_CONFIG_PATH=src/payload.config.ts
       - PORT=3000
+      - MIGRATION_DATA_DIR=/app/migration_data
