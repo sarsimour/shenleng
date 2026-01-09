@@ -24,7 +24,7 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 30m
-          # 传输镜像、配置以及数据源
+          # 将原始数据也一并传上去，放在项目目录下
           source: "shenleng-site.tar.gz,docker-compose.yml,nginx.conf,data/nextjs_content"
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
 
@@ -40,41 +40,37 @@ jobs:
             export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
-
+            
             # 停止旧服务
+            # 如果之前有裸金属部署的 PM2，先杀掉
             if command -v pm2 &> /dev/null; then pm2 delete shenleng || true; fi
             docker compose down || true
 
-            # 准备挂载目录
+            # 创建目录
             mkdir -p persistence/sqlite
             mkdir -p persistence/media
             
-            # 【核心操作】强制将挂载目录的所有权交给 UID 1000 (容器内的 node 用户)
-            # 使用 Alpine (root) 执行 chown，无视宿主机用户权限限制
-            echo "🔧 Fixing permissions to UID 1000..."
-            docker run --rm -v $(pwd)/persistence:/target alpine chown -R 1000:1000 /target
-            
-            # 也可以顺便修复一下上传的数据源权限，确保容易读取
-            chmod -R 755 data/nextjs_content
+            # 提示用户权限
+            echo "⚠️  REMINDER: Please ensure 'persistence' and 'data/nextjs_content' are owned by UID 1000"
+            echo "⚠️  Run: sudo chown -R 1000:1000 persistence/ data/nextjs_content"
 
-            # 加载镜像
+            # 导入镜像
             echo "📥 Loading image..."
             docker load < shenleng-site.tar.gz
 
             # 启动服务
             echo "🚀 Starting service..."
             echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
-            docker compose up -d
+            docker compose up -d --remove-orphans
 
-            # Nginx 配置 (确保软链存在)
+            # Nginx 重载
+            # 尝试自动链接
             if [ ! -L /etc/nginx/sites-enabled/shenleng ]; then
-                echo "Linking Nginx config..."
-                sudo ln -sf "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-enabled/shenleng
-                sudo nginx -t && sudo nginx -s reload
-            else
-                sudo nginx -s reload
+               sudo ln -sf "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-enabled/shenleng
             fi
+            sudo nginx -t && sudo nginx -s reload
 
             # 清理
             rm shenleng-site.tar.gz
             docker image prune -f
+            echo "✅ Deployment successful!"
