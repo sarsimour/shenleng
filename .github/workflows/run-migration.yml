@@ -26,11 +26,12 @@ jobs:
             docker pull ghcr.io/sarsimour/shenleng:latest
             
             echo "🚀 Running migration container..."
+            # 同样使用绝对路径
             docker run --rm \
                 --user "1000:1000" \
-                -v ~/data/shenleng/persistence/sqlite:/app/database \
-                -v ~/data/shenleng/persistence/media:/app/public/media \
-                -v ~/data/shenleng/migration_source:/app/migration_data \
+                -v /home/ecs-user/data/shenleng/persistence/sqlite:/app/database \
+                -v /home/ecs-user/data/shenleng/persistence/media:/app/public/media \
+                -v /home/ecs-user/data/shenleng/migration_source:/app/migration_source \
                 -e PAYLOAD_SECRET="$PAYLOAD_SECRET" \
                 -e DATABASE_URI="file:/app/database/payload.db" \
                 -e PAYLOAD_CONFIG_PATH="src/payload.config.ts" \

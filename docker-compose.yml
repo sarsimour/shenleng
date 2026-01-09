@@ -7,12 +7,10 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # 数据库持久化
-      - ~/data/shenleng/persistence/sqlite:/app/database
-      # 媒体文件持久化
-      - ~/data/shenleng/persistence/media:/app/public/media
-      # 原始数据源 (只读)
-      - ~/data/shenleng/migration_source:/app/migration_data:ro
+      # 使用绝对路径，避免 ~ 解析歧义
+      - /home/ecs-user/data/shenleng/persistence/sqlite:/app/database
+      - /home/ecs-user/data/shenleng/persistence/media:/app/public/media
+      - /home/ecs-user/data/shenleng/migration_source:/app/migration_data:ro
     environment:
       - NODE_ENV=production
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
