@@ -1,0 +1,34 @@
+name: Debug Server Status
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Service Status
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 10m
+          script: |
+            echo "=== 1. PM2 Process List ==="
+            pm2 list
+            
+            echo -e "\n=== 2. Application Logs (Last 50 lines) ==="
+            pm2 logs shenleng --lines 50 --nostream
+            
+            echo -e "\n=== 3. Network Ports ==="
+            sudo netstat -tulpn | grep 3000 || echo "❌ Port 3000 not listening"
+            
+            echo -e "\n=== 4. Local Connectivity Check ==="
+            curl -I http://127.0.0.1:3000 || echo "❌ Cannot connect to localhost:3000"
+            
+            echo -e "\n=== 5. Database File Check ==="
+            ls -l ~/Projects/shenleng/payload.db || echo "❌ payload.db not found"
+            
+            echo -e "\n=== 6. Nginx Configuration Test ==="
+            sudo nginx -t
