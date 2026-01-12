@@ -1,34 +1,36 @@
-name: Deploy Shenleng (Docker + GHCR)
+name: Deploy Shenleng (Docker + Alibaba Cloud ACR)
 
 on:
   push:
     branches: ["master"]
+  workflow_dispatch:  # 允许手动触发
 
 env:
-  # 镜像地址: ghcr.io/用户名/仓库名:latest
-  # ⚠️ 注意: GHCR 要求用户名和仓库名必须小写
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/sarsimour/shenleng:latest
+  # 阿里云容器镜像服务 (ACR)
+  # 格式: registry.<地域>.aliyuncs.com/<命名空间>/<仓库名>:<标签>
+  # 需要在 GitHub Secrets 中配置:
+  #   - ACR_REGISTRY: 如 registry.cn-shanghai.aliyuncs.com
+  #   - ACR_NAMESPACE: 如 shenleng
+  #   - ACR_USERNAME: 阿里云 RAM 用户名或主账号
+  #   - ACR_PASSWORD: 对应密码
+  IMAGE_NAME: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/website:latest
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write # 允许上传镜像到 GHCR
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 登录 GitHub Container Registry
-      - name: Log in to the Container registry
+      # 1. 登录阿里云容器镜像服务 (ACR)
+      - name: Login to Alibaba Cloud ACR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      # 2. 构建并推送镜像 (不再生成 tar 包)
+      # 2. 构建并推送 Docker 镜像到 ACR
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -36,68 +38,86 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_NAME }}
 
-      # 3. 传输数据和配置 (排除大镜像文件)
-      - name: Copy Config & Data to Server
+      # 3. 传输配置文件到服务器
+      - name: Copy configs to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 30m
-          # 只传配置
+          timeout: 10m
           source: "docker-compose.yml,nginx.conf"
           target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
 
-      # 4. 服务器部署
-      - name: Deploy on Server
+      # 4. 在服务器上部署
+      - name: Deploy on ECS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 20m
-          # 将 GITHUB_TOKEN 传给服务器用于拉取镜像
-          envs: PAYLOAD_SECRET, IMAGE_NAME, REGISTRY
           script: |
+            set -e
+            
+            # 环境变量
             export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
-            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" 
+            export ACR_REGISTRY="${{ secrets.ACR_REGISTRY }}"
+            export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
+            export IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
-
-            # 停止旧服务
+            
+            echo "📦 Stopping existing container..."
             docker compose down || true
-
-            # 准备目录
+            
+            echo "📁 Preparing directories..."
             mkdir -p persistence/sqlite
             mkdir -p persistence/media
             
-            # 提示权限设置 (重要!)
-            echo "🔧 Ensuring permissions..."
-            # 尝试自动修复 (如果 sudo 免密)
-            if sudo -n true 2>/dev/null; then
-              sudo chown -R 1000:1000 persistence/
-              sudo chmod -R 755 data/nextjs_content
-            else
-              echo "⚠️ Please run: sudo chown -R 1000:1000 ~/Projects/shenleng/persistence"
-            fi
-
-            # 登录 GHCR 并拉取最新镜像
-            echo "📥 Pulling image from GHCR..."
-            # 使用临时的 PAT 或直接公开包。这里尝试用 GITHUB_TOKEN 登录 (有时受限于 IP)
-            # 如果失败，请将该 Package 在 GitHub 页面设为 Public
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.IMAGE_NAME }}
-
-            # 更新 docker-compose 中的镜像名
-            # 使用 sed 替换 image: shenleng-site:latest -> image: ghcr.io/...
-            sed -i "s|image: .*|image: ${{ env.IMAGE_NAME }}|g" docker-compose.yml
-
-            # 启动服务
+            # 设置目录权限 (容器内 node 用户需要写权限)
+            echo "🔧 Setting permissions..."
+            chmod -R 777 persistence/
+            
+            echo "🔐 Logging into Alibaba Cloud ACR..."
+            echo "${{ secrets.ACR_PASSWORD }}" | docker login "$ACR_REGISTRY" -u "${{ secrets.ACR_USERNAME }}" --password-stdin
+            
+            echo "📥 Pulling latest image..."
+            docker pull "$IMAGE_NAME"
+            
+            echo "✏️ Updating docker-compose.yml with image name..."
+            sed -i "s|image:.*|image: $IMAGE_NAME|g" docker-compose.yml
+            
+            echo "🚀 Starting container..."
             echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
+            echo "ACR_REGISTRY=$ACR_REGISTRY" >> .env
             docker compose up -d --remove-orphans
-
-            # Nginx 刷新
+            
+            echo "🔄 Reloading Nginx..."
             sudo nginx -s reload || true
-
-            # 清理旧镜像
+            
+            echo "🧹 Cleaning up old images..."
             docker image prune -f
+            
+            echo "✅ Deployment complete!"
+
+  # 可选: 迁移任务 (手动触发)
+  migrate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: build-and-deploy
+    
+    steps:
+      - name: Run migration on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          timeout: 30m
+          script: |
+            cd "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            docker compose exec -T web node -e "
+              import('./src/scripts/migrate-content.ts')
+            " || echo "Migration may need manual execution"

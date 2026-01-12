@@ -11,7 +11,7 @@ async function migrate() {
   console.log('🚀 Starting Robust Migration...')
 
   const SOURCE_DIR = process.env.MIGRATION_SOURCE_DIR || path.resolve(__dirname, '../../data/nextjs_content')
-  const ARTICLES_DIR = path.join(SOURCE_DIR, 'content/articles')
+  const ARTICLES_DIR = path.join(SOURCE_DIR, 'content/json')
   const IMAGES_DIR = path.join(SOURCE_DIR, 'public/images')
   const REDIRECTS_DIR = process.env.REDIRECTS_OUTPUT_DIR || '/tmp'
 

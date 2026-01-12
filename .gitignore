@@ -40,3 +40,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 legacy_data.tar.gz
+
+# Local database
+database/
+*.db
+payload.db
+payload-test.db
+
+# Directus (abandoned)
+directus_data/
+
+# Uploaded media (managed separately)
+public/media/
+
+# Lock files (use package-lock.json)
+pnpm-lock.yaml

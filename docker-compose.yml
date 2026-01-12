@@ -1,20 +1,21 @@
 services:
   web:
     container_name: shenleng-container
-    image: ghcr.io/sarsimour/shenleng:latest
+    # 使用阿里云容器镜像服务 (ACR)
+    # 格式: registry.cn-shanghai.aliyuncs.com/<命名空间>/<镜像名>:latest
+    # 部署时会通过 sed 自动替换为实际地址
+    image: ${ACR_REGISTRY:-registry.cn-shanghai.aliyuncs.com}/shenleng/website:latest
     restart: unless-stopped
-    user: "1000:1000"
+    # 注意: 移除了 user: "1000:1000"，避免权限问题
+    # 容器内使用 node 用户，外部目录需设置正确权限
     ports:
       - "3000:3000"
     volumes:
-      # 使用绝对路径，避免 ~ 解析歧义
-      - /home/ecs-user/data/shenleng/persistence/sqlite:/app/database
-      - /home/ecs-user/data/shenleng/persistence/media:/app/public/media
-      - /home/ecs-user/data/shenleng/migration_source:/app/migration_data:ro
+      # 相对路径，在 PROJECT_DIR 下展开
+      - ./persistence/sqlite:/app/database
+      - ./persistence/media:/app/public/media
     environment:
       - NODE_ENV=production
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - DATABASE_URI=file:/app/database/payload.db
-      - PAYLOAD_CONFIG_PATH=src/payload.config.ts
       - PORT=3000
-      - MIGRATION_DATA_DIR=/app/migration_data
