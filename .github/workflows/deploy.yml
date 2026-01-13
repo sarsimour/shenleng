@@ -3,17 +3,12 @@ name: Deploy Shenleng (Docker + Alibaba Cloud ACR)
 on:
   push:
     branches: ["master"]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 env:
-  # 阿里云容器镜像服务 (ACR)
-  # 格式: registry.<地域>.aliyuncs.com/<命名空间>/<仓库名>:<标签>
-  # 需要在 GitHub Secrets 中配置:
-  #   - ACR_REGISTRY: 如 registry.cn-shanghai.aliyuncs.com
-  #   - ACR_NAMESPACE: 如 shenleng
-  #   - ACR_USERNAME: 阿里云 RAM 用户名或主账号
-  #   - ACR_PASSWORD: 对应密码
-  IMAGE_NAME: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/website:latest
+  # 阿里云容器镜像服务 - 个人版实例
+  ACR_REGISTRY: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com
+  IMAGE_NAME: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
 
 jobs:
   build-and-deploy:
@@ -26,7 +21,7 @@ jobs:
       - name: Login to Alibaba Cloud ACR
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_REGISTRY }}
+          registry: ${{ env.ACR_REGISTRY }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
@@ -60,11 +55,9 @@ jobs:
           script: |
             set -e
             
-            # 环境变量
             export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
-            export ACR_REGISTRY="${{ secrets.ACR_REGISTRY }}"
-            export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
             export IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            export ACR_REGISTRY="${{ env.ACR_REGISTRY }}"
             
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
@@ -75,9 +68,6 @@ jobs:
             echo "📁 Preparing directories..."
             mkdir -p persistence/sqlite
             mkdir -p persistence/media
-            
-            # 设置目录权限 (容器内 node 用户需要写权限)
-            echo "🔧 Setting permissions..."
             chmod -R 777 persistence/
             
             echo "🔐 Logging into Alibaba Cloud ACR..."
@@ -86,12 +76,8 @@ jobs:
             echo "📥 Pulling latest image..."
             docker pull "$IMAGE_NAME"
             
-            echo "✏️ Updating docker-compose.yml with image name..."
-            sed -i "s|image:.*|image: $IMAGE_NAME|g" docker-compose.yml
-            
             echo "🚀 Starting container..."
             echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
-            echo "ACR_REGISTRY=$ACR_REGISTRY" >> .env
             docker compose up -d --remove-orphans
             
             echo "🔄 Reloading Nginx..."
@@ -101,23 +87,3 @@ jobs:
             docker image prune -f
             
             echo "✅ Deployment complete!"
-
-  # 可选: 迁移任务 (手动触发)
-  migrate:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: build-and-deploy
-    
-    steps:
-      - name: Run migration on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 30m
-          script: |
-            cd "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-            docker compose exec -T web node -e "
-              import('./src/scripts/migrate-content.ts')
-            " || echo "Migration may need manual execution"

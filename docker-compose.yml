@@ -1,17 +1,12 @@
 services:
   web:
     container_name: shenleng-container
-    # 使用阿里云容器镜像服务 (ACR)
-    # 格式: registry.cn-shanghai.aliyuncs.com/<命名空间>/<镜像名>:latest
-    # 部署时会通过 sed 自动替换为实际地址
-    image: ${ACR_REGISTRY:-registry.cn-shanghai.aliyuncs.com}/shenleng/website:latest
+    # 阿里云容器镜像服务 (ACR) - 个人版实例
+    image: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
     restart: unless-stopped
-    # 注意: 移除了 user: "1000:1000"，避免权限问题
-    # 容器内使用 node 用户，外部目录需设置正确权限
     ports:
       - "3000:3000"
     volumes:
-      # 相对路径，在 PROJECT_DIR 下展开
       - ./persistence/sqlite:/app/database
       - ./persistence/media:/app/public/media
     environment:
