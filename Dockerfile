@@ -1,7 +1,7 @@
 FROM node:20-alpine AS base
 
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
@@ -31,8 +31,12 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/src/payload.config.ts ./src/payload.config.ts
 COPY --from=builder /app/src/collections ./src/collections
 
-# 确保 database 目录存在
-RUN mkdir -p database
+# 复制 libsql 原生模块（解决 Alpine Linux 兼容性问题）
+COPY --from=builder /app/node_modules/@libsql ./node_modules/@libsql
+COPY --from=builder /app/node_modules/libsql ./node_modules/libsql
+
+# 确保 database 目录存在并设置权限
+RUN mkdir -p database && chown -R node:node /app
 
 USER node
 EXPOSE 3000
