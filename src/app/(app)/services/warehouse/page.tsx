@@ -61,7 +61,7 @@ export default function WarehousePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/nei-zhuang-cang-chu-content-1.jpg"
+                src="/images/nei-zhuang-cang-chu-content-1.jpg"
                 alt="内装仓储作业"
                 fill
                 unoptimized
@@ -70,7 +70,7 @@ export default function WarehousePage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/nei-zhuang-cang-chu-content-2.jpg"
+                src="/images/nei-zhuang-cang-chu-content-2.jpg"
                 alt="内装仓储设施"
                 fill
                 unoptimized
@@ -93,7 +93,7 @@ export default function WarehousePage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/nei-zhuang-cang-chu-content-3.jpg"
+              src="/images/nei-zhuang-cang-chu-content-3.jpg"
               alt="冷藏集装箱仓储"
               fill
               unoptimized
@@ -120,7 +120,7 @@ export default function WarehousePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/nei-zhuang-cang-chu-content-4.JPG"
+                src="/images/nei-zhuang-cang-chu-content-4.JPG"
                 alt="内装作业现场"
                 fill
                 unoptimized
@@ -129,7 +129,7 @@ export default function WarehousePage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/nei-zhuang-cang-chu-content-5.jpg"
+                src="/images/nei-zhuang-cang-chu-content-5.jpg"
                 alt="冷藏运输车队"
                 fill
                 unoptimized

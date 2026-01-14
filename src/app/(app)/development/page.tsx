@@ -44,7 +44,7 @@ export default function DevelopmentPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/qi-ye-jian-she-content-1.jpg"
+              src="/images/qi-ye-jian-she-content-1.jpg"
               alt="企业建设"
               fill
               unoptimized
@@ -78,7 +78,7 @@ export default function DevelopmentPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/qi-ye-jian-she-content-2.jpg"
+              src="/images/qi-ye-jian-she-content-2.jpg"
               alt="制冷设备"
               fill
               unoptimized
@@ -107,7 +107,7 @@ export default function DevelopmentPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/qi-ye-jian-she-content-3.jpg"
+              src="/images/qi-ye-jian-she-content-3.jpg"
               alt="企业文化"
               fill
               unoptimized
@@ -129,7 +129,7 @@ export default function DevelopmentPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/qi-ye-jian-she-content-4.JPG"
+              src="/images/qi-ye-jian-she-content-4.JPG"
               alt="团队建设"
               fill
               unoptimized
@@ -159,7 +159,7 @@ export default function DevelopmentPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/qi-ye-jian-she-content-5.jpg"
+                src="/images/qi-ye-jian-she-content-5.jpg"
                 alt="信息化建设"
                 fill
                 unoptimized
@@ -168,7 +168,7 @@ export default function DevelopmentPage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/qi-ye-jian-she-content-6.jpg"
+                src="/images/qi-ye-jian-she-content-6.jpg"
                 alt="智能化设备"
                 fill
                 unoptimized
@@ -183,7 +183,7 @@ export default function DevelopmentPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/qi-ye-jian-she-content-7.jpg"
+              src="/images/qi-ye-jian-she-content-7.jpg"
               alt="申冷物流团队"
               fill
               unoptimized

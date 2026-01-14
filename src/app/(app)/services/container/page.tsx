@@ -44,7 +44,7 @@ export default function ContainerPage() {
 
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg my-8">
             <Image
-              src="/media/leng-cang-ji-zhuang-xiang-content-1.jpg"
+              src="/images/leng-cang-ji-zhuang-xiang-content-1.jpg"
               alt="冷藏集装箱"
               fill
               unoptimized
@@ -82,7 +82,7 @@ export default function ContainerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/leng-cang-ji-zhuang-xiang-content-2.png"
+                src="/images/leng-cang-ji-zhuang-xiang-content-2.png"
                 alt="冷藏集装箱控制面板"
                 fill
                 unoptimized
@@ -91,7 +91,7 @@ export default function ContainerPage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/leng-cang-ji-zhuang-xiang-content-3.jpg"
+                src="/images/leng-cang-ji-zhuang-xiang-content-3.jpg"
                 alt="冷藏集装箱内部"
                 fill
                 unoptimized
@@ -116,7 +116,7 @@ export default function ContainerPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/leng-cang-ji-zhuang-xiang-content-4.jpg"
+                src="/images/leng-cang-ji-zhuang-xiang-content-4.jpg"
                 alt="冷藏集装箱运输"
                 fill
                 unoptimized
@@ -125,7 +125,7 @@ export default function ContainerPage() {
             </div>
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/leng-cang-ji-zhuang-xiang-content-5.jpg"
+                src="/images/leng-cang-ji-zhuang-xiang-content-5.jpg"
                 alt="冷藏集装箱设备"
                 fill
                 unoptimized
@@ -134,7 +134,7 @@ export default function ContainerPage() {
             </div>
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/leng-cang-ji-zhuang-xiang-content-6.jpg"
+                src="/images/leng-cang-ji-zhuang-xiang-content-6.jpg"
                 alt="冷藏集装箱车队"
                 fill
                 unoptimized

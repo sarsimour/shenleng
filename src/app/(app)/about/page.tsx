@@ -106,7 +106,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/gong-si-jian-jie-content-1.jpg"
+                src="/images/gong-si-jian-jie-content-1.jpg"
                 alt="申冷物流冷藏集装箱车队"
                 fill
                 unoptimized
@@ -115,7 +115,7 @@ export default function AboutPage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/gong-si-jian-jie-content-2.jpg"
+                src="/images/gong-si-jian-jie-content-2.jpg"
                 alt="申冷物流运输设备"
                 fill
                 unoptimized
@@ -126,7 +126,7 @@ export default function AboutPage() {
           
           <div className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
             <Image
-              src="/media/gong-si-jian-jie-content-3.JPG"
+              src="/images/gong-si-jian-jie-content-3.JPG"
               alt="申冷物流车队全景"
               fill
               unoptimized
@@ -137,7 +137,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/gong-si-jian-jie-content-4.jpg"
+                src="/images/gong-si-jian-jie-content-4.jpg"
                 alt="申冷物流作业现场"
                 fill
                 unoptimized
@@ -146,7 +146,7 @@ export default function AboutPage() {
             </div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
               <Image
-                src="/media/gong-si-jian-jie-content-5.jpg"
+                src="/images/gong-si-jian-jie-content-5.jpg"
                 alt="申冷物流专业团队"
                 fill
                 unoptimized
