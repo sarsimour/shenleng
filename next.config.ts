@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'http://localhost:9000/:path*',
+        destination: 'http://versecore-api:9000/:path*',
       },
     ]
   },
