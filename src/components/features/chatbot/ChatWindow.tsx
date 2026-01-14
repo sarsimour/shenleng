@@ -2,9 +2,18 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useChat } from "@/contexts/ChatContext";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send, Loader2, Phone } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { getChatbots, startChatSession, sendMessageStream, Chatbot } from "@/lib/chatbot-api";
+
+const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
+
+我们专注港口冷藏集装箱运输，提供：
+✅ 全程制冷，GPS温控可追溯
+✅ 自营车队，最高150万责任险
+✅ 上海港区快速响应能力
+
+如需了解报价或服务详情，请直接输入您的问题，我会尽力为您解答。`;
 
 export function ChatWindow() {
   const { closeChat } = useChat();
@@ -19,6 +28,9 @@ export function ChatWindow() {
   // Initialize Chat
   useEffect(() => {
     async function init() {
+      // 先显示固定欢迎信息
+      setMessages([{ role: "ai", content: WELCOME_MESSAGE }]);
+      
       try {
         setIsLoading(true);
         const bots = await getChatbots();
@@ -29,14 +41,11 @@ export function ChatWindow() {
           
           const sid = await startChatSession(selectedBot.id);
           setSessionId(sid);
-          
-          setMessages([{ role: "ai", content: `您好！我是${selectedBot.name}。有什么我可以帮您的吗？` }]);
-        } else {
-          setError("暂无可用客服。");
         }
+        // 即使没有 chatbot，用户也能看到欢迎信息和电话
       } catch (err) {
         console.error(err);
-        setError("无法连接到客服系统。");
+        // 不显示错误，因为用户仍可以看到欢迎信息和拨打电话
       } finally {
         setIsLoading(false);
       }
@@ -110,13 +119,23 @@ export function ChatWindow() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50" ref={scrollRef}>
-        {error ? (
-          <div className="text-center text-red-500 mt-10">{error}</div>
-        ) : (
-          messages.map((msg, idx) => (
-            <ChatMessage key={idx} role={msg.role} content={msg.content} />
-          ))
+        {messages.map((msg, idx) => (
+          <ChatMessage key={idx} role={msg.role} content={msg.content} />
+        ))}
+        
+        {/* 电话拨打按钮 - 显示在欢迎信息后面 */}
+        {messages.length === 1 && messages[0].role === "ai" && (
+          <div className="flex justify-start mb-4">
+            <a
+              href="tel:021-38930219"
+              className="inline-flex items-center gap-2 bg-brand-deep text-white px-4 py-2.5 rounded-lg hover:bg-brand-deep/90 transition font-medium text-sm shadow-md"
+            >
+              <Phone size={18} />
+              <span>📞 立即拨打：021-38930219</span>
+            </a>
+          </div>
         )}
+        
         {isLoading && messages[messages.length - 1]?.role === "user" && (
            <div className="flex justify-start mb-4">
              <div className="bg-gray-100 rounded-lg px-4 py-2 flex items-center gap-2">
@@ -132,15 +151,15 @@ export function ChatWindow() {
         <div className="flex gap-2">
           <input
             className="flex-1 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-deep/50 text-sm"
-            placeholder="输入您的问题..."
+            placeholder={chatbot ? "输入您的问题..." : "AI 客服连接中，您也可以直接拨打电话"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={!!error || (isLoading && messages[messages.length -1]?.role === 'user')} 
+            disabled={!chatbot || (isLoading && messages[messages.length -1]?.role === 'user')} 
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || !!error || isLoading}
+            disabled={!input.trim() || !chatbot || isLoading}
             className="bg-brand-deep text-white p-2 rounded-full hover:bg-brand-deep/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             <Send size={20} />

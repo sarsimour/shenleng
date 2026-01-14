@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { CheckCircle2, ShieldCheck, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { useChat } from "@/contexts/ChatContext";
 
 const bannerImages = [
   { src: "/media/banner-1.jpg", alt: "申冷物流 - 安全准时全程制冷" },
@@ -13,6 +14,7 @@ const bannerImages = [
 
 export default function Hero() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const { openChat } = useChat();
 
   // Auto-advance carousel
   useEffect(() => {
@@ -58,10 +60,15 @@ export default function Hero() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <Button size="lg" className="rounded-full px-8">
+              <Button size="lg" className="rounded-full px-8" onClick={openChat}>
                 获取专业解决方案
               </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-8">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="rounded-full px-8"
+                onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 了解服务细节
               </Button>
             </div>

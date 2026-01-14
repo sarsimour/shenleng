@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Menu, X, Phone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useChat } from "@/contexts/ChatContext";
 
 const navigation = [
   { name: "首页", href: "/" },
@@ -20,6 +21,7 @@ const navigation = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { openChat } = useChat();
 
   useEffect(() => {
     setMounted(true);
@@ -54,7 +56,7 @@ export function Header() {
             <Phone size={16} />
             <span>021-38930219</span>
           </a>
-          <Button size="sm">获取专业解决方案</Button>
+          <Button size="sm" onClick={openChat}>获取专业解决方案</Button>
         </div>
 
         {/* Mobile menu button */}
@@ -110,7 +112,7 @@ export function Header() {
                   <Phone size={14} />
                   <span>021-38930219</span>
                 </a>
-                <Button className="w-full text-xs py-3 rounded-lg shadow-md">
+                <Button className="w-full text-xs py-3 rounded-lg shadow-md" onClick={() => { setMobileMenuOpen(false); openChat(); }}>
                   获取专业解决方案
                 </Button>
               </div>
