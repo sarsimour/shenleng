@@ -1,8 +1,39 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+
+const bannerImages = [
+  { src: "/media/banner-1.jpg", alt: "申冷物流 - 安全准时全程制冷" },
+  { src: "/media/banner-2.jpg", alt: "申冷物流 - 专业冷藏集装箱运输" },
+  { src: "/media/banner-3.jpg", alt: "申冷物流 - 港口冷链运输车队" },
+];
 
 export default function Hero() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-advance carousel
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % bannerImages.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + bannerImages.length) % bannerImages.length);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % bannerImages.length);
+  };
+
   return (
     <section className="relative overflow-hidden bg-white pt-16 pb-20 lg:pt-24 lg:pb-32">
       {/* Background decoration */}
@@ -50,23 +81,69 @@ export default function Hero() {
             </dl>
           </div>
 
-          {/* Right: Visual / Image Placeholder */}
+          {/* Right: Image Carousel */}
           <div className="mt-16 lg:mt-0 relative">
-            <div className="aspect-[4/3] rounded-2xl bg-slate-100 overflow-hidden shadow-2xl border border-slate-200">
-              {/* Using a placeholder service or abstract background for now */}
-              <div className="absolute inset-0 bg-gradient-to-br from-brand-deep/20 to-transparent flex items-center justify-center p-12">
-                 <div className="text-center">
-                    <div className="inline-block p-4 rounded-3xl bg-white shadow-xl mb-4">
-                       <ShieldCheck size={48} className="text-brand-deep" />
-                    </div>
-                    <div className="text-slate-400 font-medium italic">专业冷链物流场景占位</div>
-                 </div>
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative group">
+              {/* Carousel Images */}
+              {bannerImages.map((image, index) => (
+                <div
+                  key={index}
+                  className={`absolute inset-0 transition-opacity duration-700 ${
+                    index === currentSlide ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                    priority={index === 0}
+                  />
+                </div>
+              ))}
+
+              {/* Overlay gradient */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+
+              {/* Navigation Arrows */}
+              <button
+                onClick={prevSlide}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-lg"
+                aria-label="上一张"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button
+                onClick={nextSlide}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-lg"
+                aria-label="下一张"
+              >
+                <ChevronRight size={24} />
+              </button>
+
+              {/* Dots Indicator */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                {bannerImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => goToSlide(index)}
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      index === currentSlide
+                        ? "bg-white w-8"
+                        : "bg-white/50 hover:bg-white/75"
+                    }`}
+                    aria-label={`跳转到第 ${index + 1} 张图片`}
+                  />
+                ))}
               </div>
-              <img 
-                src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=2000" 
-                alt="Logistics background" 
-                className="w-full h-full object-cover mix-blend-overlay opacity-60"
-              />
+
+              {/* Slogan Overlay */}
+              <div className="absolute bottom-12 left-6 right-6 text-white pointer-events-none">
+                <div className="text-2xl sm:text-3xl font-bold tracking-wider drop-shadow-lg">
+                  安全 | 准时 | 全程制冷
+                </div>
+              </div>
             </div>
             
             {/* Stats Overlay */}
