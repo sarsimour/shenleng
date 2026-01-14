@@ -62,6 +62,7 @@ export default async function News() {
                         src={coverImageUrl}
                         alt={article.title}
                         fill
+                        unoptimized
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
