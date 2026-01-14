@@ -51,12 +51,6 @@ export default async function News() {
               <article key={article.id} className="flex flex-col group cursor-pointer">
                 <Link href={`/articles/${article.slug}`} className="flex flex-col h-full">
                   <div className="aspect-[16/9] w-full bg-slate-100 rounded-2xl mb-6 overflow-hidden relative border border-slate-100">
-                    <div className="absolute top-4 left-4 z-10">
-                      <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-brand-deep text-[10px] font-bold uppercase tracking-wider rounded-full border border-brand-deep/10 shadow-sm">
-                        {article.isLegacy ? "历史存档" : "最新动态"}
-                      </span>
-                    </div>
-                    
                     {coverImageUrl ? (
                       <Image
                         src={coverImageUrl}

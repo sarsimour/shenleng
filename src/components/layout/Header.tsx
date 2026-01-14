@@ -11,6 +11,7 @@ const navigation = [
   { name: "首页", href: "/" },
   { name: "服务范围", href: "/#services" },
   { name: "核心优势", href: "/#advantages" },
+  { name: "新闻中心", href: "/articles" },
   { name: "关于我们", href: "/about" },
 ];
 
