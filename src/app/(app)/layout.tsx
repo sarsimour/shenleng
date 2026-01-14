@@ -4,6 +4,8 @@ import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MobileCTA } from "@/components/layout/MobileCTA";
+import { ChatProvider } from "@/contexts/ChatContext";
+import { ChatWidget } from "@/components/features/chatbot/ChatWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,12 +33,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <Header />
-        <main className="flex-grow pt-16">
-          {children}
-        </main>
-        <Footer />
-        <MobileCTA />
+        <ChatProvider>
+          <Header />
+          <main className="flex-grow pt-16">
+            {children}
+          </main>
+          <Footer />
+          <MobileCTA />
+          <ChatWidget />
+        </ChatProvider>
       </body>
     </html>
   );
