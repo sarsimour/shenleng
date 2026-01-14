@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'http://localhost:8000/:path*',
+        destination: 'http://localhost:9000/:path*',
       },
     ]
   },
