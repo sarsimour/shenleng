@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "首页", href: "/" },
-  { name: "服务范围", href: "/#services" },
-  { name: "核心优势", href: "/#advantages" },
+  { name: "冷藏集装箱", href: "/services/container" },
+  { name: "内装仓储", href: "/services/warehouse" },
+  { name: "企业建设", href: "/development" },
   { name: "新闻中心", href: "/articles" },
   { name: "关于我们", href: "/about" },
+  { name: "联系我们", href: "/contact" },
 ];
 
 export function Header() {
@@ -48,9 +50,9 @@ export function Header() {
         </div>
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4 items-center">
-          <a href="tel:123456789" className="flex items-center gap-2 text-brand-deep font-semibold text-sm mr-4">
+          <a href="tel:021-38930219" className="flex items-center gap-2 text-brand-deep font-semibold text-sm mr-4">
             <Phone size={16} />
-            <span>咨询热线</span>
+            <span>021-38930219</span>
           </a>
           <Button size="sm">获取专业解决方案</Button>
         </div>
@@ -104,9 +106,9 @@ export function Header() {
               <div className="my-2 border-t border-slate-100" />
               
               <div className="px-2 py-2">
-                <a href="tel:123456789" className="flex items-center gap-2 text-brand-deep font-bold text-sm mb-3">
+                <a href="tel:021-38930219" className="flex items-center gap-2 text-brand-deep font-bold text-sm mb-3">
                   <Phone size={14} />
-                  <span>123-4567-8910</span>
+                  <span>021-38930219</span>
                 </a>
                 <Button className="w-full text-xs py-3 rounded-lg shadow-md">
                   获取专业解决方案

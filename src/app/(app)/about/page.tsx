@@ -101,25 +101,58 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* Images */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100">
+        {/* Images Gallery */}
+        <div className="mt-12 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
+              <Image
+                src="/media/gong-si-jian-jie-content-1.jpg"
+                alt="申冷物流冷藏集装箱车队"
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
+              <Image
+                src="/media/gong-si-jian-jie-content-2.jpg"
+                alt="申冷物流运输设备"
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
+          </div>
+          
+          <div className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
             <Image
-              src="/media/gong-si-jian-jie-content-1.jpg"
-              alt="申冷物流车队"
+              src="/media/gong-si-jian-jie-content-3.JPG"
+              alt="申冷物流车队全景"
               fill
               unoptimized
               className="object-cover"
             />
           </div>
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100">
-            <Image
-              src="/media/gong-si-jian-jie-content-2.jpg"
-              alt="申冷物流设备"
-              fill
-              unoptimized
-              className="object-cover"
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
+              <Image
+                src="/media/gong-si-jian-jie-content-4.jpg"
+                alt="申冷物流作业现场"
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-lg">
+              <Image
+                src="/media/gong-si-jian-jie-content-5.jpg"
+                alt="申冷物流专业团队"
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
           </div>
         </div>
       </div>
