@@ -1,6 +1,7 @@
 import { withPayload } from '@payloadcms/next/withPayload'
 import type { NextConfig } from "next";
 import path from 'path';
+import fs from 'fs';
 
 const nextConfig: NextConfig = {
   // Docker 部署必须：生成独立的最小化运行包
@@ -36,6 +37,48 @@ const nextConfig: NextConfig = {
         hostname: 'finverse.top',
       }
     ],
+  },
+  async redirects() {
+    try {
+      const mapPath = path.resolve(process.cwd(), 'redirects/url_map.json');
+      if (fs.existsSync(mapPath)) {
+        const urlMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
+        
+        return Object.entries(urlMap).map(([oldPath, newPath]) => {
+          // 处理带查询参数的 URL，例如 /show.asp?id=123
+          if (oldPath.includes('?')) {
+            const [pathname, query] = oldPath.split('?');
+            const params = new URLSearchParams(query);
+            const has = [];
+            
+            params.forEach((value, key) => {
+              has.push({
+                type: 'query',
+                key,
+                value,
+              });
+            });
+
+            return {
+              source: pathname,
+              has: has,
+              destination: newPath as string,
+              permanent: true,
+            };
+          }
+
+          // 处理普通 URL
+          return {
+            source: oldPath,
+            destination: newPath as string,
+            permanent: true,
+          };
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load redirects in next.config.ts:', e);
+    }
+    return [];
   },
   async rewrites() {
     return [

@@ -52,9 +52,13 @@ export function Footer() {
           <p className="text-xs leading-5 text-slate-400">
             &copy; {new Date().getFullYear()} 上海申冷国际物流有限公司 版权所有
           </p>
-          <div className="flex gap-x-6">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 justify-center md:justify-end">
              <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white">
                沪ICP备18000932号-1
+             </a>
+             <a href="http://www.beian.gov.cn/portal/registerSystemInfo" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+               {/* 这里将来可以放置公安备案的图标 */}
+               <span>沪公网安备 31011502010101号</span>
              </a>
           </div>
         </div>

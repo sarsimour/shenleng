@@ -6,8 +6,7 @@ import { ArrowLeft, Calendar, Clock, Share2, Phone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getPayload } from "payload";
 import config from "@/payload.config";
-
-export const dynamic = 'force-dynamic';
+import { JsonLd } from "@/components/common/JsonLd";
 
 async function getArticleData(slug: string) {
   const payload = await getPayload({ config });
@@ -22,6 +21,21 @@ async function getArticleData(slug: string) {
   });
 
   return result.docs[0] || null;
+}
+
+export async function generateStaticParams() {
+  const payload = await getPayload({ config });
+  const articles = await payload.find({
+    collection: "articles",
+    limit: 100, // 预生成的文章数量
+    select: {
+      slug: true,
+    },
+  });
+
+  return articles.docs.map((article) => ({
+    slug: article.slug,
+  }));
 }
 
 type Props = {
@@ -52,8 +66,30 @@ export default async function ArticlePage({ params }: Props) {
     ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
     : "";
 
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": article.title,
+    "description": article.summary,
+    "datePublished": article.publishedAt || article.createdAt,
+    "dateModified": article.updatedAt,
+    "author": {
+      "@type": "Organization",
+      "name": "申冷物流"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "上海申冷国际物流有限公司",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.sl-cold.com/logo.png"
+      }
+    }
+  };
+
   return (
     <article className="min-h-screen bg-white pb-24">
+      <JsonLd data={articleJsonLd} />
       {/* Article Header */}
       <div className="bg-slate-50 border-b">
         <div className="mx-auto max-w-3xl px-6 py-10">

@@ -18,3 +18,8 @@
 - [ ] **Track 4: Contact System** - 实现联系表单与 Server Actions。
 - [ ] **Track 5: CMS Integration** - 集成 Headless CMS 并展示内容。
 - [ ] **Track 6: SEO & Performance Optimization** - SEO 优化与部署准备。
+
+---
+
+- [ ] **Track: SEO优化、百度收录优化及旧站 Nginx 重定向迁移**
+*Link: [./tracks/seo_migration_20260115/](./tracks/seo_migration_20260115/)*
