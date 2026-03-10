@@ -79,6 +79,12 @@ jobs:
             echo "🚀 Starting container..."
             echo "PAYLOAD_SECRET=$PAYLOAD_SECRET" > .env
             docker compose up -d --remove-orphans
+
+            echo "🧱 Syncing database schema..."
+            docker compose exec -T web sh -c "cd /app && npm run schema:sync"
+
+            echo "🧪 Running post-deploy smoke test..."
+            docker compose exec -T -e SMOKE_BASE_URL="http://127.0.0.1:3000" web sh -c "cd /app && npm run smoke:post-deploy"
             
             echo "🔄 Reloading Nginx..."
             sudo nginx -s reload || true

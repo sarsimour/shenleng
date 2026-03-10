@@ -6,6 +6,7 @@
 - 新增前端埋点：全站页面访问自动上报（路径、来源、UTM、会话 ID、匿名 IP Hash、UA）。
 - 新增建表脚本：`npm run schema:sync`（用于首次部署后同步 SQLite schema）。
 - 新增数据清理脚本：`npm run analytics:prune`，默认保留 `180` 天。
+- 新增部署冒烟脚本：`npm run smoke:post-deploy`（发布一篇测试文章、验证 sitemap、验证埋点、自动清理）。
 
 > 说明：代码中不保存明文 IP，仅保存 `ipHash`（`SHA-256(ip + secret)` 截断）。
 
@@ -14,6 +15,14 @@
 ### 2.0 首次部署后的初始化
 - 执行一次 `npm run schema:sync`，确保 `visitor_events` 表存在。
 - 再执行应用启动或重启，使埋点接口可直接写入。
+
+### 2.0.1 推荐发布后自检（自动化）
+- 执行一次 `npm run smoke:post-deploy`。
+- 验证项：
+  - 新建文章可写入 `articles`。
+  - `sitemap.xml` 能包含新文章链接。
+  - `/api/track/pageview` 能写入 `visitor_events`。
+  - 脚本结束会自动删除测试文章与测试事件。
 
 ### 2.1 回源与缓存
 - 静态资源：`/_next/static/*`、`/media/*` 走 CDN 强缓存。

@@ -10,8 +10,9 @@
     "lint": "eslint",
     "generate:importmap": "PAYLOAD_CONFIG_PATH=src/payload.config.ts payload generate:importmap",
     "migrate:content": "PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/migrate-content.ts",
-    "schema:sync": "PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/build-init.ts",
-    "analytics:prune": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/prune-visitor-events.ts"
+    "schema:sync": "NODE_ENV=development PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/build-init.ts",
+    "analytics:prune": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/prune-visitor-events.ts",
+    "smoke:post-deploy": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/post-deploy-smoke.ts"
   },
   "dependencies": {
     "@payloadcms/db-sqlite": "^3.69.0",
