@@ -7,6 +7,7 @@ import sharp from 'sharp'
 
 import { Articles } from './collections/Articles'
 import { Media } from './collections/Media'
+import { VisitorEvents } from './collections/VisitorEvents'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -21,6 +22,7 @@ export default buildConfig({
   collections: [
     Articles,
     Media,
+    VisitorEvents,
     {
       slug: 'users',
       auth: true,

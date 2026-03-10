@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { MobileCTA } from "@/components/layout/MobileCTA";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { ChatWidget } from "@/components/features/chatbot/ChatWidget";
+import { VisitorTracker } from "@/components/analytics/VisitorTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <ChatProvider>
+          <VisitorTracker />
           <Header />
           <main className="flex-grow pt-16">
             {children}
