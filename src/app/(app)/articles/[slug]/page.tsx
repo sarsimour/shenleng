@@ -24,18 +24,26 @@ async function getArticleData(slug: string) {
 }
 
 export async function generateStaticParams() {
-  const payload = await getPayload({ config });
-  const articles = await payload.find({
-    collection: "articles",
-    limit: 100, // 预生成的文章数量
-    select: {
-      slug: true,
-    },
-  });
+  try {
+    const payload = await getPayload({ config });
+    const articles = await payload.find({
+      collection: "articles",
+      limit: 100, // 预生成的文章数量
+      select: {
+        slug: true,
+      },
+    });
 
-  return articles.docs.map((article) => ({
-    slug: article.slug,
-  }));
+    return articles.docs.map((article) => ({
+      slug: article.slug,
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("no such table: articles")) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 type Props = {
