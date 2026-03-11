@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getPayload } from 'payload';
-import config from '@/payload.config';
+import config from '../payload.config';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.finverse.top';

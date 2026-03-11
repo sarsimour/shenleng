@@ -1,6 +1,6 @@
 import { getPayload } from "payload";
-import config from "@/payload.config";
-import sitemap from "@/app/sitemap";
+import config from "../payload.config";
+import sitemap from "../app/sitemap";
 
 type PayloadDoc = {
   id: number | string;

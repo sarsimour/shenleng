@@ -19,6 +19,10 @@ ENV PAYLOAD_CONFIG_PATH=src/payload.config.ts
 RUN npx payload generate:importmap
 RUN npm run build
 
+FROM deps AS prod-deps
+WORKDIR /app
+RUN npm prune --omit=dev --legacy-peer-deps
+
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -30,10 +34,11 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/src/payload.config.ts ./src/payload.config.ts
 COPY --from=builder /app/src/collections ./src/collections
+COPY --from=builder /app/src/scripts ./src/scripts
+COPY --from=builder /app/src/app/sitemap.ts ./src/app/sitemap.ts
 
-# 复制 libsql 原生模块（解决 Alpine Linux 兼容性问题）
-COPY --from=builder /app/node_modules/@libsql ./node_modules/@libsql
-COPY --from=builder /app/node_modules/libsql ./node_modules/libsql
+# 复制完整生产依赖，确保运行时脚本 (schema/smoke) 可执行
+COPY --from=prod-deps /app/node_modules ./node_modules
 
 # 确保 database 目录存在并设置权限
 RUN mkdir -p database && chown -R node:node /app
