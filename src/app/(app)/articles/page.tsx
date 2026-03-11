@@ -6,16 +6,19 @@ import { getPayload } from "payload";
 import config from "@/payload.config";
 
 export default async function ArticlesIndex() {
-  const payload = await getPayload({ config });
-  
-  const result = await payload.find({
-    collection: "articles",
-    sort: "-publishedAt",
-    limit: 50,
-    depth: 1, // 确保获取 Media 对象的完整数据
-  });
-
-  const articles = result.docs;
+  let articles: any[] = [];
+  try {
+    const payload = await getPayload({ config });
+    const result = await payload.find({
+      collection: "articles",
+      sort: "-publishedAt",
+      limit: 50,
+      depth: 1, // 确保获取 Media 对象的完整数据
+    });
+    articles = result.docs;
+  } catch (error) {
+    console.warn("[articles] index fallback to empty list", error);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-24">

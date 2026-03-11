@@ -7,16 +7,19 @@ import { getPayload } from "payload";
 import config from "@/payload.config";
 
 export default async function News() {
-  const payload = await getPayload({ config });
-  
-  const result = await payload.find({
-    collection: "articles",
-    sort: "-publishedAt",
-    limit: 3,
-    depth: 1, // 确保获取 Media 对象的完整数据
-  });
-
-  const articles = result.docs;
+  let articles: any[] = [];
+  try {
+    const payload = await getPayload({ config });
+    const result = await payload.find({
+      collection: "articles",
+      sort: "-publishedAt",
+      limit: 3,
+      depth: 1, // 确保获取 Media 对象的完整数据
+    });
+    articles = result.docs;
+  } catch (error) {
+    console.warn("[home] news fallback to empty list", error);
+  }
 
   return (
     <section id="news" className="py-24 bg-white">
