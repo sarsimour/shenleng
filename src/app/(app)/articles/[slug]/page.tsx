@@ -38,11 +38,8 @@ export async function generateStaticParams() {
       slug: article.slug,
     }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("no such table: articles")) {
-      return [];
-    }
-    throw error;
+    console.warn("[articles] generateStaticParams fallback to []", error);
+    return [];
   }
 }
 
