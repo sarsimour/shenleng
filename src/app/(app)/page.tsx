@@ -5,6 +5,8 @@ import Trust from "@/components/sections/Trust";
 import News from "@/components/sections/News";
 import { JsonLd } from "@/components/common/JsonLd";
 
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   const organizationData = {
     "@context": "https://schema.org",

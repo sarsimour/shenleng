@@ -5,6 +5,8 @@ import { Calendar, ArrowRight, Clock } from "lucide-react";
 import { getPayload } from "payload";
 import config from "@/payload.config";
 
+export const dynamic = "force-dynamic";
+
 export default async function ArticlesIndex() {
   let articles: any[] = [];
   try {
