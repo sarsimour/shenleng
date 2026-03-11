@@ -12,6 +12,7 @@
     "migrate:content": "PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/migrate-content.ts",
     "schema:sync": "NODE_ENV=development PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/build-init.ts",
     "analytics:prune": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/prune-visitor-events.ts",
+    "analytics:report": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/marketing-report.ts",
     "smoke:post-deploy": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/post-deploy-smoke.ts"
   },
   "dependencies": {

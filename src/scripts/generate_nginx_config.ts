@@ -15,6 +15,7 @@ function generate() {
   }
 
   const urlMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
+  const legacyIdMap: Record<string, string> = {};
   
   let config = '# Nginx Redirect Rules for Shenleng Legacy Site Migration\n';
   config += '# Generated automatically from Payload CMS data\n\n';
@@ -24,12 +25,32 @@ function generate() {
   for (const [oldPath, newPath] of Object.entries(urlMap)) {
     // 确保路径中有空格或特殊字符时能正确处理
     config += `    "${oldPath}" "${newPath}";\n`;
+
+    const [pathname, queryString = ''] = oldPath.split('?', 2);
+    const params = new URLSearchParams(queryString);
+    const id = params.get('id');
+
+    if ((pathname === '/show.asp' || pathname === '/view.asp') && id) {
+      legacyIdMap[`${pathname}|${id}`] = String(newPath);
+    }
+  }
+
+  config += '}\n';
+
+  config += '\nmap "$uri|$arg_id" $new_uri_by_legacy_id {\n';
+  config += '    default "";\n\n';
+
+  for (const [legacyKey, newPath] of Object.entries(legacyIdMap)) {
+    config += `    "${legacyKey}" "${newPath}";\n`;
   }
 
   config += '}\n\n';
   config += '# Add this block to your server context:\n';
   config += '# if ($new_uri) {\n';
   config += '#     return 301 $new_uri;\n';
+  config += '# }\n';
+  config += '# if ($new_uri_by_legacy_id) {\n';
+  config += '#     return 301 $new_uri_by_legacy_id;\n';
   config += '# }\n';
 
   const outputPath = path.resolve(__dirname, '../../redirects/nginx_rewrite_rules.conf');
