@@ -126,7 +126,7 @@ export function ChatWindow() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[90vw] md:w-[400px] h-[600px] max-h-[80vh] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden">
+    <div className="fixed inset-x-2 bottom-4 z-50 h-[600px] max-h-[80vh] w-auto rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden flex flex-col md:inset-x-auto md:right-4 md:w-[400px]">
       {/* Header */}
       <div className="bg-brand-deep text-white p-4 flex justify-between items-center shrink-0">
         <div className="font-bold text-lg flex items-center gap-2">
