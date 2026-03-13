@@ -80,14 +80,6 @@ const nextConfig: NextConfig = {
     }
     return [];
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/proxy/:path*',
-        destination: 'http://versecore-api:9000/:path*',
-      },
-    ]
-  },
 };
 
 export default withPayload(nextConfig);

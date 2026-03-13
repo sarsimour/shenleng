@@ -13,4 +13,5 @@ services:
       - NODE_ENV=production
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - DATABASE_URI=file:/app/database/payload.db
+      - VERSECORE_API_BASE_URL=${VERSECORE_API_BASE_URL}
       - PORT=3000
