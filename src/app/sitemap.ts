@@ -13,7 +13,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/about',
     '/contact',
     '/services/container',
-    '/services/warehouse',
     '/articles',
   ].map((route) => ({
     url: `${baseUrl}${route}`,
@@ -23,7 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // 2. 动态路由 (文章)
-  let articleRoutes: any[] = [];
+  let articleRoutes: MetadataRoute.Sitemap = [];
   try {
     const payload = await getPayload({ config });
     const articles = await payload.find({

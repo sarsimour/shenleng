@@ -102,7 +102,7 @@ export default function ContactPage() {
                 </li>
                 <li className="flex items-center gap-3">
                   <span className="w-2 h-2 bg-brand-primary rounded-full"></span>
-                  冷箱内装仓储
+                  冷箱插电托管
                 </li>
                 <li className="flex items-center gap-3">
                   <span className="w-2 h-2 bg-brand-primary rounded-full"></span>

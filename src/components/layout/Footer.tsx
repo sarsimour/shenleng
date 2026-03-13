@@ -33,7 +33,6 @@ export function Footer() {
                 <h3 className="text-sm font-semibold leading-6 text-white">服务</h3>
                 <ul role="list" className="mt-6 space-y-4">
                   <li><Link href="/services/container" className="text-sm leading-6 hover:text-white">冷藏集装箱</Link></li>
-                  <li><Link href="/services/warehouse" className="text-sm leading-6 hover:text-white">内装仓储</Link></li>
                   <li><Link href="/development" className="text-sm leading-6 hover:text-white">企业建设</Link></li>
                   <li><Link href="/articles" className="text-sm leading-6 hover:text-white">新闻中心</Link></li>
                 </ul>

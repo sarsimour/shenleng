@@ -1,49 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a; /* Slate 900 for better readability */
-  
-  /* Brand Colors - Logistics & Trust */
-  --brand-deep: #003366;    /* Deep Ocean Blue - Primary */
-  --brand-primary: #1e40af; /* Trust Blue */
-  --brand-navy: #001f3f;    /* Deep Navy */
-  --brand-accent: #3b82f6;  /* Accent Blue */
-  
-  --muted: #64748b;
-  --muted-foreground: #94a3b8;
-  
-  --border: #e2e8f0;
+  --background: #f4f8fc;
+  --foreground: #10233b;
+  --brand-deep: #0f2942;
+  --brand-primary: #1b4f78;
+  --brand-navy: #0a1b2d;
+  --brand-accent: #1e9de6;
+  --muted: #5f7287;
+  --muted-foreground: #8fa0b2;
+  --border: #d5e1ec;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  
   --color-primary: var(--brand-deep);
   --color-primary-foreground: #ffffff;
-  
   --color-brand-deep: var(--brand-deep);
   --color-brand-primary: var(--brand-primary);
   --color-brand-navy: var(--brand-navy);
   --color-brand-accent: var(--brand-accent);
-  
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  
   --color-border: var(--border);
-  
-  --font-sans: "Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif";
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* For B2B logistics, we might keep it light by default, 
-       but providing a subtle dark mode for modern feel */
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --border: #1e293b;
-  }
+  --font-sans: var(--font-geist-sans), "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-display: var(--font-geist-mono), "DIN Alternate", "Bahnschrift", sans-serif;
 }
 
 * {
@@ -51,9 +33,16 @@
 }
 
 body {
-  background: var(--background);
+  background: radial-gradient(120% 160% at 10% 0%, #ffffff 0%, #f4f8fc 60%, #edf3f9 100%);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.pattern-grid {
+  background-image:
+    linear-gradient(rgba(14, 41, 67, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 41, 67, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
 }

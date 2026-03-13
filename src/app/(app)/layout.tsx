@@ -44,7 +44,7 @@ export default function RootLayout({
         <ChatProvider>
           <VisitorTracker />
           <Header />
-          <main className="flex-grow pt-16">
+          <main className="flex-grow pt-16 lg:pt-24">
             {children}
           </main>
           <Footer />

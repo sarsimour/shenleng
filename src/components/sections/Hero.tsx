@@ -1,162 +1,136 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, ShieldCheck, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
+import {
+  ShieldCheck,
+  ThermometerSnowflake,
+  Clock3,
+  Siren,
+  CircleCheckBig,
+} from "lucide-react";
 
-const bannerImages = [
-  { src: "/media/banner-1.jpg", alt: "申冷物流 - 安全准时全程制冷" },
-  { src: "/media/banner-2.jpg", alt: "申冷物流 - 专业冷藏集装箱运输" },
-  { src: "/media/banner-3.jpg", alt: "申冷物流 - 港口冷链运输车队" },
+const capabilities = [
+  "上海港/宁波港冷藏箱进出口运输",
+  "冷箱插电托管与状态巡检",
+  "异常件快速响应与多式联运衔接",
+];
+
+const dashboard = [
+  { label: "常规调度响应", value: "10-30 分钟" },
+  { label: "单车责任险", value: "最高 150 万" },
+  { label: "温控监控", value: "全程可追溯" },
+  { label: "服务模式", value: "全自营" },
 ];
 
 export default function Hero() {
-  const [currentSlide, setCurrentSlide] = useState(0);
   const { openChat } = useChat();
 
-  // Auto-advance carousel
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % bannerImages.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + bannerImages.length) % bannerImages.length);
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % bannerImages.length);
-  };
-
   return (
-    <section className="relative overflow-hidden bg-white pt-16 pb-20 lg:pt-24 lg:pb-32">
-      {/* Background decoration */}
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(45%_45%_at_50%_50%,rgba(59,130,246,0.05)_0%,rgba(255,255,255,0)_100%)]" />
-      
+    <section className="relative overflow-hidden pt-20 pb-20 lg:pt-28 lg:pb-24">
+      <div className="absolute inset-0 -z-10 pattern-grid opacity-40" />
+      <div className="absolute -top-24 right-[-160px] -z-10 h-[420px] w-[420px] rounded-full bg-brand-accent/15 blur-3xl" />
+
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="lg:grid lg:grid-cols-2 lg:gap-x-12 lg:items-center">
-          {/* Left: Content */}
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-deep/5 border border-brand-deep/10 text-brand-deep text-sm font-medium mb-8">
-              <ShieldCheck size={16} />
-              <span>专业冷链 · 解决问题 · 敢于负责</span>
+        <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-deep/15 bg-white px-3 py-1.5 text-sm font-semibold text-brand-deep">
+              <ShieldCheck size={15} />
+              货代团队的冷链执行伙伴
             </div>
-            
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl mb-6 leading-[1.15]">
-              把冷链交给我们，<br />
-              <span className="text-brand-deep">您只需要关心生意</span>
+
+            <h1 className="text-4xl font-bold leading-[1.12] text-slate-900 sm:text-5xl lg:text-6xl">
+              报价快、执行稳、
+              <br />
+              <span className="text-brand-deep">异常件有兜底</span>
             </h1>
-            
-            <p className="text-lg leading-8 text-slate-600 mb-10 max-w-xl">
-              在冷链运输中，您担心断电、晚点或无人负责？申冷物流通过自营资产与数字化监控，让您的每一票货物都安全、准时、可追溯。
+
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
+              你关心的不只是运价，而是准点提箱、全程制冷、出了异常有人扛责。申冷把这些环节做成可执行、可追踪、可复盘的标准化服务。
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <Button size="lg" className="rounded-full px-8" onClick={openChat}>
-                获取专业解决方案
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {capabilities.map((item) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  <CircleCheckBig className="mt-0.5 shrink-0 text-brand-accent" size={15} />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button onClick={openChat} size="lg" className="rounded-full px-8 font-semibold">
+                立即沟通运力与报价
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="rounded-full px-8"
-                onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full px-8 font-semibold"
+                onClick={() => document.getElementById("proof")?.scrollIntoView({ behavior: "smooth" })}
               >
-                了解服务细节
+                查看现场执行证据
               </Button>
             </div>
 
-            <dl className="grid grid-cols-1 gap-y-4 sm:grid-cols-2 sm:gap-x-8">
-              {[
-                { icon: CheckCircle2, text: "全程制冷，过程可验证" },
-                { icon: Zap, text: "港口异常快速处理能力" },
-                { icon: ShieldCheck, text: "最高 150 万单车责任险" },
-                { icon: CheckCircle2, text: "全自营团队，责任不外包" },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <item.icon className="text-brand-accent" size={18} />
-                  <span>{item.text}</span>
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+                  <Clock3 size={14} />
+                  准时率
                 </div>
-              ))}
-            </dl>
+                <div className="mt-2 text-2xl font-bold text-brand-deep">99%+</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+                  <ThermometerSnowflake size={14} />
+                  温控覆盖
+                </div>
+                <div className="mt-2 text-2xl font-bold text-brand-deep">100%</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+                  <Siren size={14} />
+                  异常响应
+                </div>
+                <div className="mt-2 text-2xl font-bold text-brand-deep">7x24</div>
+              </div>
+            </div>
           </div>
 
-          {/* Right: Image Carousel */}
-          <div className="mt-16 lg:mt-0 relative">
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative group">
-              {/* Carousel Images */}
-              {bannerImages.map((image, index) => (
-                <div
-                  key={index}
-                  className={`absolute inset-0 transition-opacity duration-700 ${
-                    index === currentSlide ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  <Image
-                    src={image.src}
-                    alt={image.alt}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                    priority={index === 0}
-                  />
+          <div className="relative">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+              <div className="relative aspect-[5/4]">
+                <Image
+                  src="/images/jin-chu-kou-yun-shu-content-1.JPG"
+                  alt="申冷物流港区作业现场"
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  priority
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#071524]/70 to-transparent" />
+                <div className="absolute left-5 top-5 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-brand-deep">
+                  现场实拍 · 非精修图
                 </div>
-              ))}
+                <div className="absolute bottom-5 left-5 right-5 rounded-xl border border-white/25 bg-black/35 p-4 text-white backdrop-blur-sm">
+                  <p className="text-sm text-slate-100">当前服务重点</p>
+                  <p className="mt-1 text-xl font-bold">港口冷藏箱进出口运输与异常件兜底</p>
+                </div>
+              </div>
 
-              {/* Overlay gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-lg"
-                aria-label="上一张"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              <button
-                onClick={nextSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-lg"
-                aria-label="下一张"
-              >
-                <ChevronRight size={24} />
-              </button>
-
-              {/* Dots Indicator */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                {bannerImages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => goToSlide(index)}
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      index === currentSlide
-                        ? "bg-white w-8"
-                        : "bg-white/50 hover:bg-white/75"
-                    }`}
-                    aria-label={`跳转到第 ${index + 1} 张图片`}
-                  />
+              <div className="grid grid-cols-2 gap-0 border-t border-slate-200">
+                {dashboard.map((item) => (
+                  <div key={item.label} className="border-r border-b border-slate-200 px-4 py-3 last:border-r-0 even:border-r-0">
+                    <p className="text-xs text-slate-500">{item.label}</p>
+                    <p className="mt-1 text-base font-bold text-brand-deep">{item.value}</p>
+                  </div>
                 ))}
               </div>
-
-              {/* Slogan Overlay */}
-              <div className="absolute bottom-12 left-6 right-6 text-white pointer-events-none">
-                <div className="text-2xl sm:text-3xl font-bold tracking-wider drop-shadow-lg">
-                  安全 | 准时 | 全程制冷
-                </div>
-              </div>
-            </div>
-            
-            {/* Stats Overlay */}
-            <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 hidden sm:block">
-              <div className="text-3xl font-bold text-brand-deep">100%</div>
-              <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">全程温控覆盖率</div>
             </div>
           </div>
         </div>

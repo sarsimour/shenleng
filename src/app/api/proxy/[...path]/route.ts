@@ -18,17 +18,21 @@ function normalizeBaseURL(raw: string | undefined): string {
   return raw.trim().replace(/\/+$/, "");
 }
 
-function resolveBackendBaseURL(): string {
+function resolveBackendBaseURL(): string[] {
   const configured = normalizeBaseURL(process.env.VERSECORE_API_BASE_URL);
-  if (configured) return configured;
+  if (configured) return [configured];
 
-  return process.env.NODE_ENV === "production"
-    ? "https://api.finverse.top/v2"
-    : "http://127.0.0.1:8000";
+  if (process.env.NODE_ENV === "production") {
+    return ["https://api.finverse.top/v2"];
+  }
+
+  // Dev fallback candidates:
+  // - 8000: common uvicorn local run
+  // - 9000: common dockerized VerseCore run
+  return ["http://127.0.0.1:8000", "http://127.0.0.1:9000"];
 }
 
-function buildTargetURL(req: NextRequest, pathSegments: string[]): string {
-  const baseURL = resolveBackendBaseURL();
+function buildTargetURL(baseURL: string, req: NextRequest, pathSegments: string[]): string {
   const encodedPath = pathSegments.map((segment) => encodeURIComponent(segment)).join("/");
   const search = req.nextUrl.search || "";
   return `${baseURL}/${encodedPath}${search}`;
@@ -46,7 +50,7 @@ function buildForwardHeaders(req: NextRequest): Headers {
 }
 
 async function proxy(req: NextRequest, pathSegments: string[]) {
-  const targetURL = buildTargetURL(req, pathSegments);
+  const baseURLs = resolveBackendBaseURL();
   const method = req.method.toUpperCase();
   const headers = buildForwardHeaders(req);
   const isBodyAllowed = method !== "GET" && method !== "HEAD";
@@ -56,38 +60,49 @@ async function proxy(req: NextRequest, pathSegments: string[]) {
     body = await req.arrayBuffer();
   }
 
-  try {
-    const upstream = await fetch(targetURL, {
-      method,
-      headers,
-      body,
-      redirect: "manual",
-    });
+  const connectionErrors: { targetURL: string; error: unknown }[] = [];
 
-    const responseHeaders = new Headers();
-    upstream.headers.forEach((value, key) => {
-      if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
-      responseHeaders.set(key, value);
-    });
+  for (const baseURL of baseURLs) {
+    const targetURL = buildTargetURL(baseURL, req, pathSegments);
+    try {
+      const upstream = await fetch(targetURL, {
+        method,
+        headers,
+        body,
+        redirect: "manual",
+      });
 
-    return new NextResponse(upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders,
-    });
-  } catch (error) {
-    console.error("Proxy request failed:", {
-      targetURL,
-      method,
-      error,
-    });
-    return NextResponse.json(
-      {
-        error: "VERSECORE_PROXY_FAILED",
-        targetURL,
-      },
-      { status: 502 },
-    );
+      const responseHeaders = new Headers();
+      upstream.headers.forEach((value, key) => {
+        if (HOP_BY_HOP_HEADERS.has(key.toLowerCase())) return;
+        responseHeaders.set(key, value);
+      });
+
+      return new NextResponse(upstream.body, {
+        status: upstream.status,
+        headers: responseHeaders,
+      });
+    } catch (error) {
+      connectionErrors.push({ targetURL, error });
+      continue;
+    }
   }
+
+  const primaryTargetURL = buildTargetURL(baseURLs[0], req, pathSegments);
+  console.error("Proxy request failed:", {
+    attemptedTargets: connectionErrors.map((item) => item.targetURL),
+    method,
+    lastError: connectionErrors[connectionErrors.length - 1]?.error,
+  });
+
+  return NextResponse.json(
+    {
+      error: "VERSECORE_PROXY_FAILED",
+      targetURL: primaryTargetURL,
+      attemptedTargets: connectionErrors.map((item) => item.targetURL),
+    },
+    { status: 502 },
+  );
 }
 
 type RouteContext = {

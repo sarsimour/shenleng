@@ -1,63 +1,68 @@
 import React from "react";
-import { Eye, ShieldCheck, Award, MessageSquare } from "lucide-react";
+import { AlarmClockCheck, ClipboardList, Route, ShieldCheck } from "lucide-react";
 
-const values = [
+const workflow = [
   {
-    name: "过程可验证，拒绝“经验主义”",
-    description: "全车配备 GPS + 发电机云监控系统。准时率与温控全程可追溯，数据实时上传，不靠口头保证。",
-    icon: Eye,
+    title: "接单校验",
+    icon: ClipboardList,
+    detail: "确认箱型、温区、门点、截港时间与风口参数，避免“信息缺项”导致现场返工。",
+    time: "T+0",
   },
   {
-    name: "资产与制度托底",
-    description: "冷链不是靠调度拼出来的，而是靠自有资产和严格制度支撑。我们把事情做重，只为让您更省心。",
-    icon: Award,
+    title: "执行调度",
+    icon: Route,
+    detail: "按港区与路况动态分配运力，关键节点同步，异常预警前置。",
+    time: "T+10min",
   },
   {
-    name: "风险兜底，不扯皮",
-    description: "单车物流责任险最高 150 万，可按需加购单票货物险。出了问题我们敢于负责，风险我们扛。",
+    title: "异常处理",
+    icon: AlarmClockCheck,
+    detail: "堵港、换箱、设备告警由专人接管，快速给出可执行方案。",
+    time: "T+30min",
+  },
+  {
+    title: "结果回传",
     icon: ShieldCheck,
-  },
-  {
-    name: "快速响应的专家团队",
-    description: "上海港首批进口备案冷运车队。懂冷藏箱、懂堆场、懂调度，遇到异常情况快速处理，减少您的沟通成本。",
-    icon: MessageSquare,
+    detail: "回传温控轨迹与操作记录，形成可复盘交付，支持后续索赔与质量追踪。",
+    time: "交付后",
   },
 ];
 
 export default function ValueProp() {
   return (
-    <section id="advantages" className="py-24 bg-brand-deep text-white overflow-hidden relative scroll-mt-20">
-      {/* Background patterns */}
-      <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 opacity-10">
-        <Award size={400} />
-      </div>
+    <section id="advantages" className="py-24 bg-brand-navy text-white overflow-hidden relative scroll-mt-24">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_80%_0%,rgba(30,157,230,0.2)_0%,rgba(10,27,45,0)_70%)]" />
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 relative z-10">
-        <div className="mx-auto max-w-2xl lg:text-center mb-16">
-          <h2 className="text-base font-semibold leading-7 text-brand-accent">为什么选择申冷</h2>
-          <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            一次不出问题，比什么都重要
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="mb-14 max-w-3xl">
+          <p className="text-sm font-semibold tracking-wider text-brand-accent uppercase">
+            执行方法
           </p>
-          <p className="mt-6 text-lg leading-8 text-blue-100/70">
-            我们理解冷链业务的脆弱性，因此我们建立了最稳固的保障体系，让您无需反复解释。
+          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            货代最怕的不确定，我们把它流程化
+          </h2>
+          <p className="mt-4 text-blue-100/85 leading-7">
+            申冷把复杂冷链拆成标准动作，避免“靠经验、靠临场、靠运气”的不稳定执行。
           </p>
         </div>
-        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-          <dl className="grid max-w-xl grid-cols-1 gap-x-12 gap-y-16 lg:max-w-none lg:grid-cols-2">
-            {values.map((value) => (
-              <div key={value.name} className="relative pl-16">
-                <dt className="text-xl font-bold leading-7">
-                  <div className="absolute left-0 top-0 flex h-12 w-12 items-center justify-center rounded-lg bg-brand-accent text-white shadow-lg">
-                    <value.icon className="h-6 w-6" aria-hidden="true" />
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          {workflow.map((item) => (
+            <article key={item.title} className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-accent/30 text-white">
+                    <item.icon size={20} />
                   </div>
-                  {value.name}
-                </dt>
-                <dd className="mt-4 text-base leading-7 text-blue-100/70">
-                  {value.description}
-                </dd>
+                  <h3 className="mt-4 text-xl font-bold">{item.title}</h3>
+                </div>
+                <span className="rounded-full border border-brand-accent/40 px-3 py-1 text-xs font-semibold text-brand-accent">
+                  {item.time}
+                </span>
               </div>
-            ))}
-          </dl>
+              <p className="mt-4 text-sm leading-7 text-blue-100/85">{item.detail}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>

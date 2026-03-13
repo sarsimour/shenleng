@@ -1,17 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Menu, X, Phone } from "lucide-react";
+import { Menu, X, Phone, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
 import { useChat } from "@/contexts/ChatContext";
 
 const navigation = [
   { name: "首页", href: "/" },
   { name: "冷藏集装箱", href: "/services/container" },
-  { name: "内装仓储", href: "/services/warehouse" },
   { name: "企业建设", href: "/development" },
   { name: "新闻中心", href: "/articles" },
   { name: "关于我们", href: "/about" },
@@ -20,31 +18,40 @@ const navigation = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const { openChat } = useChat();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const canUseDOM = typeof window !== "undefined";
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-white/80 backdrop-blur-md border-b">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8" aria-label="Global">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/92 backdrop-blur-xl">
+      <div className="hidden lg:block border-b border-slate-200/70 bg-slate-900 text-slate-200">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 text-xs lg:px-8">
+          <div className="flex items-center gap-5">
+            <span>服务对象：货代公司 / 外贸工厂 / 进口商</span>
+            <span>24h 异常响应机制</span>
+            <span>全程温控可追溯</span>
+          </div>
+          <span className="font-semibold text-slate-100">上海港 · 宁波港</span>
+        </div>
+      </div>
+
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8" aria-label="Global">
         <div className="flex lg:flex-1">
-          <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
+          <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-3">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-deep text-white font-bold">
+              SL
+            </div>
             <span className="text-2xl font-bold text-brand-deep tracking-tight">申冷物流</span>
             <span className="hidden sm:inline-block h-6 w-[1px] bg-slate-200 mx-2" />
-            <span className="hidden sm:inline-block text-sm text-slate-500 font-medium">SHENLENG</span>
+            <span className="hidden sm:inline-block text-xs text-slate-500 font-semibold tracking-[0.18em]">SHENLENG LOGISTICS</span>
           </Link>
         </div>
         
-        {/* Desktop Navigation */}
-        <div className="hidden lg:flex lg:gap-x-8">
+        <div className="hidden lg:flex lg:gap-x-7">
           {navigation.map((item) => (
             <Link
               key={item.name}
               href={item.href}
-              className="text-sm font-semibold leading-6 text-slate-900 hover:text-brand-primary transition-colors"
+              className="text-[15px] font-semibold leading-6 text-slate-900 hover:text-brand-primary transition-colors"
             >
               {item.name}
             </Link>
@@ -52,14 +59,15 @@ export function Header() {
         </div>
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4 items-center">
-          <a href="tel:021-38930219" className="flex items-center gap-2 text-brand-deep font-semibold text-sm mr-4">
+          <a href="tel:021-38930219" className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-brand-deep font-semibold text-sm">
             <Phone size={16} />
             <span>021-38930219</span>
           </a>
-          <Button size="sm" onClick={openChat}>获取专业解决方案</Button>
+          <Button size="sm" className="rounded-full px-5 font-semibold" onClick={openChat}>
+            10分钟获取运输建议
+          </Button>
         </div>
 
-        {/* Mobile menu button */}
         <div className="flex lg:hidden">
           <button
             type="button"
@@ -72,7 +80,7 @@ export function Header() {
       </nav>
 
       {/* Mobile menu - Rendered via Portal */}
-      {mounted && mobileMenuOpen && createPortal(
+      {canUseDOM && mobileMenuOpen && createPortal(
         <div className="relative z-[100]">
           {/* Transparent overlay for closing when clicking outside */}
           <div 
@@ -81,7 +89,7 @@ export function Header() {
           />
 
           {/* Mobile menu panel - Floating Card style */}
-          <div className="fixed top-20 right-4 w-64 origin-top-right overflow-hidden rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-900/5 lg:hidden animate-in zoom-in-95 fade-in duration-200">
+          <div className="fixed top-20 right-4 w-72 origin-top-right overflow-hidden rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-900/5 lg:hidden animate-in zoom-in-95 fade-in duration-200">
             <div className="flex flex-col gap-y-1">
               <div className="flex items-center justify-between mb-4 px-2">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">导航菜单</span>
@@ -92,6 +100,14 @@ export function Header() {
                 >
                   <X className="h-4 w-4" />
                 </button>
+              </div>
+
+              <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                <p>货代公司友好：异常件优先处理</p>
+                <p className="mt-1 flex items-center gap-1 text-brand-deep font-semibold">
+                  <Clock3 size={12} />
+                  7x24 值守
+                </p>
               </div>
               
               {navigation.map((item) => (
@@ -113,7 +129,7 @@ export function Header() {
                   <span>021-38930219</span>
                 </a>
                 <Button className="w-full text-xs py-3 rounded-lg shadow-md" onClick={() => { setMobileMenuOpen(false); openChat(); }}>
-                  获取专业解决方案
+                  立即沟通运力与报价
                 </Button>
               </div>
             </div>

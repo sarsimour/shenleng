@@ -3,6 +3,7 @@ import Services from "@/components/sections/Services";
 import ValueProp from "@/components/sections/ValueProp";
 import Trust from "@/components/sections/Trust";
 import News from "@/components/sections/News";
+import RealityProof from "@/components/sections/RealityProof";
 import { JsonLd } from "@/components/common/JsonLd";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default function Home() {
       <JsonLd data={organizationData} />
       <Hero />
       <Services />
+      <RealityProof />
       <ValueProp />
       <News />
       <Trust />

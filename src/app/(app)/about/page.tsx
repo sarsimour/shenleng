@@ -72,7 +72,7 @@ export default function AboutPage() {
           </p>
           <ul>
             <li>港口冷箱进出口公路运输</li>
-            <li>冷箱内装仓储</li>
+            <li>冷箱插电托管与暂落箱服务</li>
             <li>冷箱多式联运</li>
             <li>冷链城配与集货</li>
             <li>冷货干线运输</li>
