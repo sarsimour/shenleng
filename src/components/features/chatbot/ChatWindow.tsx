@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { X, Send, Loader2, Phone } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
-import { getChatbots, startChatSession, sendMessageStream, Chatbot } from "@/lib/chatbot-api";
+import { startChatSession, sendMessageStream, Chatbot } from "@/lib/chatbot-api";
 
 const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
 
@@ -15,6 +15,10 @@ const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
 
 如需了解报价或服务详情，请直接输入您的问题，我会尽力为您解答。`;
 
+const REQUIRED_CHATBOT_ID = process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID?.trim() || "";
+const CONFIGURED_CHATBOT_NAME =
+  process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME?.trim() || "申冷售前顾问";
+
 export function ChatWindow() {
   const { closeChat } = useChat();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
@@ -22,7 +26,6 @@ export function ChatWindow() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatbot, setChatbot] = useState<Chatbot | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Initialize Chat
@@ -30,22 +33,39 @@ export function ChatWindow() {
     async function init() {
       // 先显示固定欢迎信息
       setMessages([{ role: "ai", content: WELCOME_MESSAGE }]);
-      
+
       try {
         setIsLoading(true);
-        const bots = await getChatbots();
-        if (bots.length > 0) {
-          // Prefer "Test Chatbot" or the first one
-          const selectedBot = bots.find(b => b.name === "Test Chatbot") || bots[0];
-          setChatbot(selectedBot);
-          
-          const sid = await startChatSession(selectedBot.id);
-          setSessionId(sid);
+        if (!REQUIRED_CHATBOT_ID) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "ai",
+              content:
+                "系统配置缺失：未设置 NEXT_PUBLIC_LOGISTICS_CHATBOT_ID，暂时无法连接 AI 客服。",
+            },
+          ]);
+          return;
         }
-        // 即使没有 chatbot，用户也能看到欢迎信息和电话
+
+        const fixedBot: Chatbot = {
+          id: REQUIRED_CHATBOT_ID,
+          name: CONFIGURED_CHATBOT_NAME,
+          description: "Configured Shenleng sales assistant",
+        };
+        setChatbot(fixedBot);
+
+        const sid = await startChatSession(REQUIRED_CHATBOT_ID);
+        setSessionId(sid);
       } catch (err) {
         console.error(err);
-        // 不显示错误，因为用户仍可以看到欢迎信息和拨打电话
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "ai",
+            content: "AI 客服暂时不可用，您可以直接拨打电话获得即时支持。",
+          },
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -123,8 +143,8 @@ export function ChatWindow() {
           <ChatMessage key={idx} role={msg.role} content={msg.content} />
         ))}
         
-        {/* 电话拨打按钮 - 显示在欢迎信息后面 */}
-        {messages.length === 1 && messages[0].role === "ai" && (
+        {/* 电话拨打按钮 - AI 未连通时保持可见 */}
+        {(!sessionId || !chatbot) && (
           <div className="flex justify-start mb-4">
             <a
               href="tel:021-38930219"

@@ -1,5 +1,7 @@
-const API_BASE = "/api/proxy";
+export const API_BASE = "/api/proxy";
 const ANONYMOUS_PASSWORD = "anonymous_placeholder";
+const APP_ID_HEADER = "X-App-ID";
+const DEFAULT_APP_ID = process.env.NEXT_PUBLIC_VERSECORE_APP_ID || "logistics-web";
 
 export interface Chatbot {
   id: string;
@@ -22,6 +24,12 @@ const AUTH_USER_KEY = "shenleng_chat_user";
 type StoredUser = { username: string };
 
 let authInFlight: Promise<string> | null = null;
+
+function withAppIdHeaders(headers?: HeadersInit): Headers {
+  const merged = new Headers(headers);
+  merged.set(APP_ID_HEADER, DEFAULT_APP_ID);
+  return merged;
+}
 
 function readStoredUsername(): string | null {
   if (typeof window === "undefined") return null;
@@ -54,7 +62,7 @@ function clearAuth() {
 async function loginWithUsername(username: string): Promise<string | null> {
   const loginRes = await fetch(`${API_BASE}/users/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: withAppIdHeaders({ "Content-Type": "application/x-www-form-urlencoded" }),
     body: new URLSearchParams({
       username,
       password: ANONYMOUS_PASSWORD,
@@ -73,6 +81,7 @@ async function loginWithUsername(username: string): Promise<string | null> {
 async function createAnonymousUsername(): Promise<string> {
   const regRes = await fetch(`${API_BASE}/users/anonymous`, {
     method: "POST",
+    headers: withAppIdHeaders(),
   });
 
   if (!regRes.ok) {
@@ -142,7 +151,7 @@ export async function getAuthToken(forceRefresh = false): Promise<string> {
 
 async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   let token = await getAuthToken();
-  const headers = new Headers(init.headers);
+  const headers = withAppIdHeaders(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
 
   let res = await fetch(input, { ...init, headers });
@@ -150,10 +159,15 @@ async function authedFetch(input: string, init: RequestInit = {}): Promise<Respo
 
   // Token expired/invalid: re-auth once and retry.
   token = await getAuthToken(true);
-  const retryHeaders = new Headers(init.headers);
+  const retryHeaders = withAppIdHeaders(init.headers);
   retryHeaders.set("Authorization", `Bearer ${token}`);
   res = await fetch(input, { ...init, headers: retryHeaders });
   return res;
+}
+
+export async function authedProxyFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return authedFetch(`${API_BASE}${normalizedPath}`, init);
 }
 
 export async function getChatbots(): Promise<Chatbot[]> {
