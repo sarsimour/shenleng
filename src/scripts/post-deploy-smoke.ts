@@ -1,6 +1,5 @@
 import { getPayload } from "payload";
 import config from "../payload.config";
-import sitemap from "../app/sitemap";
 
 type PayloadDoc = {
   id: number | string;
@@ -65,12 +64,15 @@ async function run() {
     }
     console.log("✅ New article page is reachable.");
 
-    const generatedSitemap = await sitemap();
-    const hasInSitemap = generatedSitemap.some((item) => item.url.endsWith(path));
-    if (!hasInSitemap) {
-      throw new Error(`Sitemap generator output does not include ${path}`);
+    const sitemapRes = await fetch(`${baseURL}/sitemap.xml`);
+    if (!sitemapRes.ok) {
+      throw new Error(`Sitemap request failed: ${sitemapRes.status}`);
     }
-    console.log("✅ Sitemap generator includes new article.");
+    const sitemapXML = await sitemapRes.text();
+    if (!sitemapXML.includes(path)) {
+      throw new Error(`Sitemap output does not include ${path}`);
+    }
+    console.log("✅ Sitemap includes new article.");
 
     const trackRes = await fetch(`${baseURL}/api/track/pageview`, {
       method: "POST",

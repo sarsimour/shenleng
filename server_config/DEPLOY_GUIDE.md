@@ -19,7 +19,26 @@
 
 ---
 
-## 二、GitHub Secrets 配置
+## 二、ACR 自动构建配置
+
+当前生产链路以阿里云容器镜像服务为镜像构建方：
+
+1. ACR 镜像仓库绑定 GitHub 代码源。
+2. ACR 构建规则监听 `master` 分支。
+3. 新代码推送后，ACR 自动按仓库中的 `Dockerfile` 构建 `latest` 镜像。
+4. ECS 只拉取 ACR 已构建好的镜像并用 `docker compose` 启动。
+
+GitHub Actions 不负责构建或推送镜像，只负责把 `docker-compose.yml`/`nginx.conf` 同步到 ECS，并等待 ACR 自动构建产出新镜像后部署。
+
+当前镜像地址：
+
+```text
+crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
+```
+
+---
+
+## 三、GitHub Secrets 配置
 
 在 GitHub 仓库 → Settings → Secrets and variables → Actions 中添加以下 Secrets:
 
@@ -36,7 +55,7 @@
 
 ---
 
-## 三、ECS 服务器初始化 (一次性)
+## 四、ECS 服务器初始化 (一次性)
 
 ### 1. 安装 Docker
 ```bash
@@ -78,14 +97,16 @@ sudo certbot --nginx -d www.finverse.top -d finverse.top
 
 ---
 
-## 四、部署流程
+## 五、部署流程
 
 ### 自动部署 (推荐)
 1. 提交代码到 `master` 分支
-2. GitHub Actions 自动执行:
-   - 构建 Docker 镜像
-   - 推送到阿里云 ACR
-   - SSH 到 ECS 服务器拉取并部署
+2. 阿里云 ACR 自动构建并发布 `latest` 镜像
+3. GitHub Actions 自动执行:
+   - 同步 `docker-compose.yml` 和 `nginx.conf` 到 ECS
+   - SSH 到 ECS 等待 ACR 新镜像
+   - 拉取 ACR 镜像并重建容器
+   - 执行数据库 schema sync 和 post-deploy smoke test
 
 ### 手动部署
 ```bash
@@ -93,19 +114,18 @@ sudo certbot --nginx -d www.finverse.top -d finverse.top
 cd ~/Projects/shenleng
 
 # 登录 ACR
-docker login registry.cn-shanghai.aliyuncs.com
+docker login crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com
 
 # 拉取最新镜像
-docker pull registry.cn-shanghai.aliyuncs.com/shenleng/website:latest
+docker pull crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
 
 # 重启服务
-docker compose down
-docker compose up -d
+docker compose up -d --remove-orphans --force-recreate
 ```
 
 ---
 
-## 五、数据迁移
+## 六、数据迁移
 
 首次部署后需要迁移文章数据:
 
@@ -124,7 +144,7 @@ docker compose exec web sh -c "cd /app && npx tsx src/scripts/migrate-content.ts
 
 ---
 
-## 六、验证
+## 七、验证
 
 1. 访问 https://www.finverse.top 检查首页
 2. 访问 https://www.finverse.top/articles 检查文章列表
@@ -132,7 +152,7 @@ docker compose exec web sh -c "cd /app && npx tsx src/scripts/migrate-content.ts
 
 ---
 
-## 七、常见问题
+## 八、常见问题
 
 ### 镜像拉取失败
 - 检查 ACR 凭证是否正确
