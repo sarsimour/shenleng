@@ -31,19 +31,28 @@ jobs:
       # 2. 阿里云 ACR 已绑定 GitHub 自动构建；这里仅等待新镜像并部署
       - name: Deploy on ECS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          ACR_REGISTRY: ${{ env.ACR_REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 20m
           command_timeout: 30m
+          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL
           script: |
             set -e
-            
-            export PAYLOAD_SECRET="${{ secrets.PAYLOAD_SECRET }}"
-            export VERSECORE_API_BASE_URL="${{ secrets.VERSECORE_API_BASE_URL }}"
-            export IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            export ACR_REGISTRY="${{ env.ACR_REGISTRY }}"
+
+            : "${ACR_REGISTRY:?ACR_REGISTRY is required}"
+            : "${IMAGE_NAME:?IMAGE_NAME is required}"
+            : "${ACR_USERNAME:?ACR_USERNAME is required}"
+            : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
+            : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
             
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
@@ -67,7 +76,7 @@ jobs:
             df -h /
             
             echo "🔐 Logging into Alibaba Cloud ACR..."
-            echo "${{ secrets.ACR_PASSWORD }}" | docker login "$ACR_REGISTRY" -u "${{ secrets.ACR_USERNAME }}" --password-stdin
+            printf '%s' "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
             
             echo "📥 Waiting for Alibaba Cloud ACR automated build..."
             previous_digest="$(docker image inspect "$IMAGE_NAME" --format '{{index .RepoDigests 0}}' 2>/dev/null | sed 's/.*@//' || true)"
