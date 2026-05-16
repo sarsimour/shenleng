@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { getPayload } from 'payload';
 import config from '../payload.config';
-import { getSiteUrl } from '@/lib/site';
+import { getSiteUrl } from '../lib/site';
 
 export const dynamic = "force-dynamic";
 

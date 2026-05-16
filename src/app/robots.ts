@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { getSiteUrl } from '@/lib/site';
+import { getSiteUrl } from '../lib/site';
 
 export default function robots(): MetadataRoute.Robots {
   const privatePaths = ['/api/', '/_next/', '/static/', '/admin/', '/knowledge-admin'];

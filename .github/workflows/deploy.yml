@@ -62,31 +62,42 @@ jobs:
             
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
-            
-            echo "📦 Stopping existing container..."
-            docker compose down || true
-            
+
             echo "📁 Preparing directories..."
             mkdir -p persistence/sqlite
             mkdir -p persistence/media
             chmod -R 777 persistence/
+
+            echo "🧹 Reclaiming safe Docker disk space before deploy..."
+            docker container prune -f || true
+            docker image prune -f || true
+            docker builder prune -af || true
+            df -h /
             
             echo "🔐 Logging into Alibaba Cloud ACR..."
             echo "${{ secrets.ACR_PASSWORD }}" | docker login "$ACR_REGISTRY" -u "${{ secrets.ACR_USERNAME }}" --password-stdin
             
             echo "📥 Pulling latest image..."
             docker pull "$IMAGE_NAME"
-            
-            echo "🚀 Starting container..."
+
+            echo "🧾 Writing runtime environment..."
             if [ -z "$VERSECORE_API_BASE_URL" ]; then
               VERSECORE_API_BASE_URL="http://versecore-api:9000"
             fi
+            if [ -z "$PAYLOAD_SECRET" ]; then
+              echo "PAYLOAD_SECRET is required." >&2
+              exit 1
+            fi
 
-            cat > .env <<EOF
+            umask 077
+            cat > .env.tmp <<EOF
             PAYLOAD_SECRET=$PAYLOAD_SECRET
             VERSECORE_API_BASE_URL=$VERSECORE_API_BASE_URL
             EOF
-            docker compose up -d --remove-orphans
+            mv .env.tmp .env
+
+            echo "🚀 Recreating container with latest image..."
+            docker compose up -d --remove-orphans --force-recreate
 
             echo "🧱 Syncing database schema..."
             docker compose exec -T web sh -c "cd /app && npm run schema:sync"
