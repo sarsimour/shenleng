@@ -7,8 +7,18 @@ const nextConfig: NextConfig = {
   // Docker 部署必须：生成独立的最小化运行包
   output: "standalone", 
   
-  // 必须：排除构建时不需要打包的二进制依赖
-  serverExternalPackages: ['payload', 'sharp'],
+  // Payload SQLite adapter 依赖 libsql 原生包，standalone trace 需要显式保留这些服务端包。
+  serverExternalPackages: ['payload', 'sharp', 'libsql', '@libsql/client'],
+  outputFileTracingIncludes: {
+    '/*': [
+      './node_modules/libsql/**/*',
+      './node_modules/@libsql/client/**/*',
+      './node_modules/.pnpm/libsql@*/node_modules/libsql/**/*',
+      './node_modules/.pnpm/libsql@*/node_modules/@libsql/**/*',
+      './node_modules/.pnpm/libsql@*/node_modules/@neon-rs/**/*',
+      './node_modules/.pnpm/@libsql+*/node_modules/@libsql/**/*',
+    ],
+  },
   
   env: {
     // 强制指定 Payload 配置文件路径，解决 "config required" 错误
@@ -49,7 +59,7 @@ const nextConfig: NextConfig = {
           if (oldPath.includes('?')) {
             const [pathname, query] = oldPath.split('?');
             const params = new URLSearchParams(query);
-            const has = [];
+            const has: Array<{ type: 'query'; key: string; value: string }> = [];
             
             params.forEach((value, key) => {
               has.push({

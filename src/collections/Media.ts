@@ -5,7 +5,6 @@ export const Media: CollectionConfig = {
   upload: {
     // 使用相对路径，避免 __dirname 在 Server Action / Bundled 环境下的解析问题
     staticDir: 'public/media',
-    staticURL: '/media',
     mimeTypes: ['image/*'],
   },
   access: {

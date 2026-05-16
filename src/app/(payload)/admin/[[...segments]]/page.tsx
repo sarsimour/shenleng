@@ -17,13 +17,15 @@ export const generateMetadata = async ({ params, searchParams }: Args): Promise<
   generatePageMetadata({ config, params, searchParams })
 
 const Page = async ({ params, searchParams }: Args) => {
-  return RootPage({ 
+  const rootPageArgs = {
     config, 
     params, 
     searchParams, 
     importMap, 
     serverFunction: handleServerFunctions 
-  })
+  } as Parameters<typeof RootPage>[0]
+
+  return RootPage(rootPageArgs)
 }
 
 export default Page

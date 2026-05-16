@@ -13,11 +13,21 @@ export function Footer() {
               专业的港口冷藏集装箱运输服务商。安全、准时、全程制冷，以客户为中心、以品质求生存。
             </p>
             <div className="flex flex-col space-y-3">
-              <a href="tel:021-38930219" className="flex items-center gap-2 hover:text-white transition-colors">
+              <a
+                href="tel:021-38930219"
+                data-analytics-target="footer_phone"
+                data-analytics-label="021-38930219"
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
                 <Phone size={16} />
                 <span>021-38930219 / 021-50673637</span>
               </a>
-              <a href="mailto:wangyw@sl-cold.com" className="flex items-center gap-2 hover:text-white transition-colors">
+              <a
+                href="mailto:wangyw@sl-cold.com"
+                data-analytics-target="footer_email"
+                data-analytics-label="wangyw@sl-cold.com"
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
                 <Mail size={16} />
                 <span>wangyw@sl-cold.com</span>
               </a>

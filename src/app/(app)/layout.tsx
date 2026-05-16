@@ -7,6 +7,7 @@ import { MobileCTA } from "@/components/layout/MobileCTA";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { ChatWidget } from "@/components/features/chatbot/ChatWidget";
 import { VisitorTracker } from "@/components/analytics/VisitorTracker";
+import { getBaiduVerification, getSiteUrl } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,16 +19,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baiduSiteVerification = getBaiduVerification();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.finverse.top'),
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: "申冷物流 - 专业的港口冷藏集装箱运输服务商",
     template: "%s | 申冷物流"
   },
   description: "申冷物流专注提供安全、准时、全程制冷的港口冷链物流解决方案。自营车队、GPS监控、高额保险，为您的冷链业务保驾护航。",
   keywords: "冷链物流, 港口运输, 冷藏集装箱, 上海港, 申冷物流",
+  alternates: {
+    canonical: "/",
+  },
   other: {
     "applicable-device": "pc,mobile",
+    ...(baiduSiteVerification ? { "baidu-site-verification": baiduSiteVerification } : {}),
   }
 };
 

@@ -5,38 +5,65 @@ import Trust from "@/components/sections/Trust";
 import News from "@/components/sections/News";
 import RealityProof from "@/components/sections/RealityProof";
 import { JsonLd } from "@/components/common/JsonLd";
+import { absoluteUrl, serviceKeywords, shenlengCompany } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  const organizationData = {
+  const structuredData = {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "上海申冷国际物流有限公司",
-    "alternateName": "申冷物流",
-    "url": "https://www.sl-cold.com",
-    "logo": "https://www.sl-cold.com/logo.png",
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": "021-38930219",
-      "contactType": "customer service",
-      "areaServed": "CN",
-      "availableLanguage": "Chinese"
-    },
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "华洲路94号",
-      "addressLocality": "上海市",
-      "addressRegion": "浦东新区",
-      "postalCode": "200000",
-      "addressCountry": "CN"
-    },
-    "description": "专业的港口冷藏集装箱运输服务商，提供安全、准时、全程制冷的冷链物流解决方案。"
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": absoluteUrl("/#organization"),
+        name: shenlengCompany.legalName,
+        alternateName: [shenlengCompany.brandName, shenlengCompany.englishName],
+        url: absoluteUrl("/"),
+        logo: absoluteUrl("/images/gong-si-jian-jie-content-3.JPG"),
+        description: shenlengCompany.description,
+        keywords: serviceKeywords.join(", "),
+        contactPoint: {
+          "@type": "ContactPoint",
+          telephone: shenlengCompany.phoneNumbers[0],
+          contactType: "customer service",
+          areaServed: "CN",
+          availableLanguage: "Chinese",
+        },
+        address: {
+          "@type": "PostalAddress",
+          ...shenlengCompany.address,
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": absoluteUrl("/#website"),
+        name: `${shenlengCompany.brandName}官网`,
+        url: absoluteUrl("/"),
+        publisher: {
+          "@id": absoluteUrl("/#organization"),
+        },
+        inLanguage: "zh-CN",
+      },
+      {
+        "@type": "Service",
+        "@id": absoluteUrl("/services/container#service"),
+        name: "上海港冷链车队与冷藏集装箱运输服务",
+        serviceType: "冷藏集装箱进出口公路运输",
+        provider: {
+          "@id": absoluteUrl("/#organization"),
+        },
+        areaServed: shenlengCompany.areaServed,
+        url: absoluteUrl("/services/container"),
+        keywords: serviceKeywords.join(", "),
+        description:
+          "面向货代、外贸工厂和冷链客户，提供上海港冷链车队、冷箱全程制冷运输、冷箱温度异常处理和冷箱暂落箱服务。",
+      },
+    ],
   };
 
   return (
     <>
-      <JsonLd data={organizationData} />
+      <JsonLd data={structuredData} />
       <Hero />
       <Services />
       <RealityProof />

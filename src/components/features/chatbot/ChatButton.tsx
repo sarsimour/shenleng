@@ -12,6 +12,9 @@ export function ChatButton() {
   return (
     <button
       onClick={toggleChat}
+      data-analytics-event="chat_open"
+      data-analytics-target="floating_chat_button"
+      data-analytics-label="Open Chat"
       className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-deep text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center hidden lg:flex"
       aria-label="Open Chat"
     >

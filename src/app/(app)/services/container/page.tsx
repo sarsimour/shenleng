@@ -6,6 +6,9 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "冷藏集装箱 - 申冷物流",
   description: "冷藏集装箱被普遍用于国际冷藏货物的海铁公路运输，申冷物流提供专业的冷藏集装箱运输服务。",
+  alternates: {
+    canonical: "/services/container",
+  },
 };
 
 export default function ContainerPage() {

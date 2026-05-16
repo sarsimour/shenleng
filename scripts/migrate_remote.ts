@@ -15,6 +15,19 @@ const JSON_DIR = path.join(DATA_DIR, 'content/json');
 const PUBLIC_DIR = path.join(DATA_DIR, 'public'); // 图片所在的根目录
 // ===========================================
 
+type RemoteArticlePayload = {
+  title: string;
+  slug: string;
+  summary?: string;
+  legacyHtml?: string;
+  originalUrl?: string;
+  isLegacy: boolean;
+  baseViews: number;
+  publishedAt: string;
+  content: typeof DEFAULT_CONTENT;
+  coverImage?: number;
+};
+
 // 简单的 RichText 占位符
 const DEFAULT_CONTENT = {
   root: {
@@ -170,11 +183,6 @@ async function checkArticleExists(slug: string, token: string) {
   return data.docs && data.docs.length > 0;
 }
 
-// 需要在文件头部引入 openAsBlob
-import { openAsBlob } from 'fs';
-
-// ... (其他代码)
-
 async function uploadMedia(filePath: string, token: string) {
   const fileName = path.basename(filePath);
 
@@ -184,10 +192,9 @@ async function uploadMedia(filePath: string, token: string) {
 
   try {
     // 使用 Node.js 原生 openAsBlob (Node 18+)
-    // @ts-ignore
     const blob = await openAsBlob(filePath);
     formData.append('file', blob, fileName);
-  } catch (e) {
+  } catch {
      // 回退方案
      const fileBuffer = fs.readFileSync(filePath);
      const mimeType = getMimeType(fileName);
@@ -198,7 +205,6 @@ async function uploadMedia(filePath: string, token: string) {
   const res = await fetch(`${API_URL}/media`, {
     method: 'POST',
     headers: { Authorization: `JWT ${token}` },
-    // @ts-ignore - fetch accepts FormData
     body: formData,
   });
 
@@ -211,7 +217,7 @@ async function uploadMedia(filePath: string, token: string) {
   return data.doc.id;
 }
 
-async function createArticle(articleData: any, token: string) {
+async function createArticle(articleData: RemoteArticlePayload, token: string) {
   const res = await fetch(`${API_URL}/articles`, {
     method: 'POST',
     headers: {

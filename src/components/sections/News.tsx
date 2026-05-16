@@ -7,7 +7,7 @@ import { getPayload } from "payload";
 import config from "@/payload.config";
 
 type ArticleListItem = {
-  id: string;
+  id: string | number;
   title: string;
   slug: string;
   summary: string;
@@ -28,7 +28,7 @@ export default async function News() {
       limit: 3,
       depth: 1, // 确保获取 Media 对象的完整数据
     });
-    articles = result.docs as ArticleListItem[];
+    articles = result.docs as unknown as ArticleListItem[];
   } catch (error) {
     console.warn("[home] news fallback to empty list", error);
   }

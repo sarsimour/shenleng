@@ -5,6 +5,7 @@ import { useChat } from "@/contexts/ChatContext";
 import { X, Send, Loader2, Phone } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { startChatSession, sendMessageStream, Chatbot } from "@/lib/chatbot-api";
+import { trackSiteEvent } from "@/components/analytics/VisitorTracker";
 
 const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
 
@@ -37,6 +38,11 @@ export function ChatWindow() {
       try {
         setIsLoading(true);
         if (!REQUIRED_CHATBOT_ID) {
+          trackSiteEvent({
+            eventType: "chat_unavailable",
+            target: "missing_chatbot_id",
+            label: "NEXT_PUBLIC_LOGISTICS_CHATBOT_ID",
+          });
           setMessages((prev) => [
             ...prev,
             {
@@ -57,8 +63,18 @@ export function ChatWindow() {
 
         const sid = await startChatSession(REQUIRED_CHATBOT_ID);
         setSessionId(sid);
+        trackSiteEvent({
+          eventType: "chat_session_started",
+          target: "versecore_chatbot",
+          label: REQUIRED_CHATBOT_ID,
+        });
       } catch (err) {
         console.error(err);
+        trackSiteEvent({
+          eventType: "chat_unavailable",
+          target: "versecore_start_failed",
+          label: err instanceof Error ? err.message : "unknown",
+        });
         setMessages((prev) => [
           ...prev,
           {
@@ -90,6 +106,11 @@ export function ChatWindow() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setIsLoading(true);
+    trackSiteEvent({
+      eventType: "chat_message_sent",
+      target: "chat_window",
+      label: userMsg.slice(0, 80),
+    });
 
     try {
       // Add placeholder for AI response
@@ -112,6 +133,11 @@ export function ChatWindow() {
       }
     } catch (err) {
       console.error(err);
+      trackSiteEvent({
+        eventType: "chat_message_failed",
+        target: "chat_window",
+        label: err instanceof Error ? err.message : "unknown",
+      });
       setMessages((prev) => [...prev, { role: "ai", content: "抱歉，出错了，请稍后再试。" }]);
     } finally {
       setIsLoading(false);
@@ -148,6 +174,8 @@ export function ChatWindow() {
           <div className="flex justify-start mb-4">
             <a
               href="tel:021-38930219"
+              data-analytics-target="chat_fallback_phone"
+              data-analytics-label="021-38930219"
               className="inline-flex items-center gap-2 bg-brand-deep text-white px-4 py-2.5 rounded-lg hover:bg-brand-deep/90 transition font-medium text-sm shadow-md"
             >
               <Phone size={18} />

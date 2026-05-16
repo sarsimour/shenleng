@@ -6,6 +6,10 @@ import config from "@/payload.config";
 const MAX_TEXT_LENGTH = 1024;
 
 type TrackBody = {
+  eventType?: string;
+  target?: string;
+  label?: string;
+  value?: number;
   path?: string;
   query?: string;
   pageTitle?: string;
@@ -46,9 +50,29 @@ function getReferrerHost(referrer: string): string {
   }
 }
 
+async function parseTrackBody(req: NextRequest): Promise<TrackBody | null> {
+  const raw = await req.text();
+  if (!raw.trim()) return null;
+
+  try {
+    return JSON.parse(raw) as TrackBody;
+  } catch {
+    return null;
+  }
+}
+
+function clampNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return value;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as TrackBody;
+    const body = await parseTrackBody(req);
+    if (!body) {
+      return NextResponse.json({ ok: true, skipped: true }, { status: 202 });
+    }
+
     const path = clamp(body.path, 512) || "/";
     const query = clamp(body.query, 1024);
     const referrer = clamp(body.referrer, 1024);
@@ -63,6 +87,10 @@ export async function POST(req: NextRequest) {
       collection: "visitorEvents",
       overrideAccess: true,
       data: {
+        eventType: clamp(body.eventType, 64) || "pageview",
+        target: clamp(body.target, 256),
+        label: clamp(body.label, 256),
+        value: clampNumber(body.value),
         path,
         query,
         pageTitle,

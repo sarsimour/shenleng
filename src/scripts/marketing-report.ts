@@ -5,6 +5,10 @@ import config from "../payload.config";
 
 type VisitorEventDoc = {
   id: number | string;
+  eventType?: string | null;
+  target?: string | null;
+  label?: string | null;
+  value?: number | null;
   path?: string | null;
   query?: string | null;
   referrer?: string | null;
@@ -125,6 +129,8 @@ function buildReportText(input: {
   now: Date;
   from: Date;
   totalEvents: number;
+  totalPageviews: number;
+  totalConversions: number;
   totalSessions: number;
   totalIps: number;
   bounceSessions: number;
@@ -136,6 +142,8 @@ function buildReportText(input: {
   utmSource: Map<string, number>;
   utmMedium: Map<string, number>;
   utmCampaign: Map<string, number>;
+  conversionByType: Map<string, number>;
+  conversionByTarget: Map<string, number>;
   topN: number;
   includeBots: boolean;
 }): string {
@@ -143,6 +151,8 @@ function buildReportText(input: {
     now,
     from,
     totalEvents,
+    totalPageviews,
+    totalConversions,
     totalSessions,
     totalIps,
     bounceSessions,
@@ -154,17 +164,21 @@ function buildReportText(input: {
     utmSource,
     utmMedium,
     utmCampaign,
+    conversionByType,
+    conversionByTarget,
     topN,
     includeBots,
   } = input;
 
   const header = [
-    "Finverse Marketing Analytics Report",
+    "Shenleng Marketing Analytics Report",
     `Time Window: ${from.toISOString()} -> ${now.toISOString()}`,
     `Data Filter: includeBots=${includeBots}`,
     "",
     "Core KPIs:",
-    `- Pageviews (PV): ${totalEvents}`,
+    `- Total Events: ${totalEvents}`,
+    `- Pageviews (PV): ${totalPageviews}`,
+    `- Conversion Events: ${totalConversions}`,
     `- Sessions: ${totalSessions}`,
     `- Approx Unique Visitors (by ipHash): ${totalIps}`,
     `- Bounce Sessions: ${bounceSessions} (${toPercent(bounceSessions, totalSessions)})`,
@@ -186,6 +200,10 @@ function buildReportText(input: {
     ...formatTopRows("Top UTM Medium", sortTop(utmMedium, topN), totalEvents),
     "",
     ...formatTopRows("Top UTM Campaign", sortTop(utmCampaign, topN), totalEvents),
+    "",
+    ...formatTopRows("Top Conversion Types", sortTop(conversionByType, topN), totalConversions),
+    "",
+    ...formatTopRows("Top Conversion Targets", sortTop(conversionByTarget, topN), totalConversions),
   ];
 
   return [...header, ...blocks].join("\n");
@@ -289,10 +307,15 @@ async function run(): Promise<void> {
   const utmSource = new Map<string, number>();
   const utmMedium = new Map<string, number>();
   const utmCampaign = new Map<string, number>();
+  const conversionByType = new Map<string, number>();
+  const conversionByTarget = new Map<string, number>();
   const uniqueIpHashes = new Set<string>();
   const sessions = new Map<string, SessionAggregate>();
+  let totalPageviews = 0;
+  let totalConversions = 0;
 
   for (const event of events) {
+    const eventType = clean(event.eventType, "pageview");
     const path = clean(event.path, "/");
     const query = new URLSearchParams(clean(event.query));
     const source = clean(event.utmSource || query.get("utm_source"), "(none)");
@@ -306,16 +329,26 @@ async function run(): Promise<void> {
     const createdAt = new Date(clean(event.createdAt, now.toISOString())).getTime();
     const sessionId = clean(event.sessionId, ipHash ? `ip:${ipHash}` : `event:${event.id}`);
 
-    increment(pageViewsByPath, path);
-    if (path.startsWith("/articles/")) {
-      increment(articleViewsByPath, path);
+    if (eventType === "pageview") {
+      totalPageviews += 1;
+      increment(pageViewsByPath, path);
+      if (path.startsWith("/articles/")) {
+        increment(articleViewsByPath, path);
+      }
+    } else {
+      totalConversions += 1;
+      increment(conversionByType, eventType);
+      increment(conversionByTarget, clean(event.target, "(unspecified)"));
     }
+
     increment(referrerByHost, referrerHost);
     increment(utmSource, source);
     increment(utmMedium, medium);
     increment(utmCampaign, campaign);
 
     if (ipHash) uniqueIpHashes.add(ipHash);
+
+    if (eventType !== "pageview") continue;
 
     const session = sessions.get(sessionId);
     if (!session) {
@@ -348,6 +381,8 @@ async function run(): Promise<void> {
     now,
     from,
     totalEvents,
+    totalPageviews,
+    totalConversions,
     totalSessions,
     totalIps: uniqueIpHashes.size,
     bounceSessions,
@@ -359,6 +394,8 @@ async function run(): Promise<void> {
     utmSource,
     utmMedium,
     utmCampaign,
+    conversionByType,
+    conversionByTarget,
     topN: options.topN,
     includeBots: options.includeBots,
   });

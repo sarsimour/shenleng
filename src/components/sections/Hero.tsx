@@ -64,13 +64,23 @@ export default function Hero() {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button onClick={openChat} size="lg" className="rounded-full px-8 font-semibold">
+              <Button
+                onClick={openChat}
+                size="lg"
+                className="rounded-full px-8 font-semibold"
+                data-analytics-event="chat_open"
+                data-analytics-target="hero_primary_chat"
+                data-analytics-label="立即沟通运力与报价"
+              >
                 立即沟通运力与报价
               </Button>
               <Button
                 variant="outline"
                 size="lg"
                 className="rounded-full px-8 font-semibold"
+                data-analytics-event="cta_click"
+                data-analytics-target="hero_proof_scroll"
+                data-analytics-label="查看现场执行证据"
                 onClick={() => document.getElementById("proof")?.scrollIntoView({ behavior: "smooth" })}
               >
                 查看现场执行证据

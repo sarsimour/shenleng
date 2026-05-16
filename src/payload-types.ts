@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     articles: Article;
     media: Media;
+    visitorEvents: VisitorEvent;
     users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -79,6 +80,7 @@ export interface Config {
   collectionsSelect: {
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    visitorEvents: VisitorEventsSelect<false> | VisitorEventsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -183,6 +185,32 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "visitorEvents".
+ */
+export interface VisitorEvent {
+  id: number;
+  eventType: string;
+  target?: string | null;
+  label?: string | null;
+  value?: number | null;
+  path: string;
+  query?: string | null;
+  pageTitle?: string | null;
+  referrer?: string | null;
+  referrerHost?: string | null;
+  sessionId?: string | null;
+  ipHash?: string | null;
+  userAgent?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
@@ -236,6 +264,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'visitorEvents';
+        value: number | VisitorEvent;
       } | null)
     | ({
         relationTo: 'users';
@@ -320,6 +352,31 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "visitorEvents_select".
+ */
+export interface VisitorEventsSelect<T extends boolean = true> {
+  eventType?: T;
+  target?: T;
+  label?: T;
+  value?: T;
+  path?: T;
+  query?: T;
+  pageTitle?: T;
+  referrer?: T;
+  referrerHost?: T;
+  sessionId?: T;
+  ipHash?: T;
+  userAgent?: T;
+  utmSource?: T;
+  utmMedium?: T;
+  utmCampaign?: T;
+  utmContent?: T;
+  utmTerm?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

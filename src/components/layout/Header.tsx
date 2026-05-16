@@ -59,11 +59,23 @@ export function Header() {
         </div>
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4 items-center">
-          <a href="tel:021-38930219" className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-brand-deep font-semibold text-sm">
+          <a
+            href="tel:021-38930219"
+            data-analytics-target="header_phone"
+            data-analytics-label="021-38930219"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-brand-deep font-semibold text-sm"
+          >
             <Phone size={16} />
             <span>021-38930219</span>
           </a>
-          <Button size="sm" className="rounded-full px-5 font-semibold" onClick={openChat}>
+          <Button
+            size="sm"
+            className="rounded-full px-5 font-semibold"
+            data-analytics-event="chat_open"
+            data-analytics-target="header_chat"
+            data-analytics-label="10分钟获取运输建议"
+            onClick={openChat}
+          >
             10分钟获取运输建议
           </Button>
         </div>
@@ -124,11 +136,22 @@ export function Header() {
               <div className="my-2 border-t border-slate-100" />
               
               <div className="px-2 py-2">
-                <a href="tel:021-38930219" className="flex items-center gap-2 text-brand-deep font-bold text-sm mb-3">
+                <a
+                  href="tel:021-38930219"
+                  data-analytics-target="mobile_menu_phone"
+                  data-analytics-label="021-38930219"
+                  className="flex items-center gap-2 text-brand-deep font-bold text-sm mb-3"
+                >
                   <Phone size={14} />
                   <span>021-38930219</span>
                 </a>
-                <Button className="w-full text-xs py-3 rounded-lg shadow-md" onClick={() => { setMobileMenuOpen(false); openChat(); }}>
+                <Button
+                  className="w-full text-xs py-3 rounded-lg shadow-md"
+                  data-analytics-event="chat_open"
+                  data-analytics-target="mobile_menu_chat"
+                  data-analytics-label="立即沟通运力与报价"
+                  onClick={() => { setMobileMenuOpen(false); openChat(); }}
+                >
                   立即沟通运力与报价
                 </Button>
               </div>

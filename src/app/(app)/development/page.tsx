@@ -6,6 +6,9 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "企业建设 - 申冷物流",
   description: "申冷物流企业建设规划，包括人事管理、企业文化、制度建设和信息化建设。",
+  alternates: {
+    canonical: "/development",
+  },
 };
 
 export default function DevelopmentPage() {

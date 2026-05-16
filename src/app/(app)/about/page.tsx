@@ -5,6 +5,9 @@ import Image from "next/image";
 export const metadata: Metadata = {
   title: "关于我们 - 申冷物流",
   description: "上海申冷国际物流有限公司是一家专门从事冷藏集装箱运输的企业，采用全自营的经营模式。",
+  alternates: {
+    canonical: "/about",
+  },
 };
 
 export default function AboutPage() {

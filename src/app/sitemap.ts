@@ -1,11 +1,12 @@
 import { MetadataRoute } from 'next';
 import { getPayload } from 'payload';
 import config from '../payload.config';
+import { getSiteUrl } from '@/lib/site';
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.finverse.top';
+  const baseUrl = getSiteUrl();
 
   // 1. 静态路由
   const routes = [
@@ -13,6 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/about',
     '/contact',
     '/services/container',
+    '/development',
     '/articles',
   ].map((route) => ({
     url: `${baseUrl}${route}`,

@@ -2,13 +2,14 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Calendar, Clock, Share2, Phone } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { ArrowLeft, Calendar, Share2 } from "lucide-react";
 import { getPayload } from "payload";
 import config from "@/payload.config";
 import { JsonLd } from "@/components/common/JsonLd";
+import { absoluteUrl, shenlengCompany } from "@/lib/site";
+import type { Article } from "@/payload-types";
 
-async function getArticleData(slug: string) {
+async function getArticleData(slug: string): Promise<Article | null> {
   const payload = await getPayload({ config });
   const result = await payload.find({
     collection: "articles",
@@ -56,12 +57,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${article.title} - 申冷物流`,
     description: article.summary,
+    alternates: {
+      canonical: `/articles/${slug}`,
+    },
   };
 }
 
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
-  const article = await getArticleData(slug) as any;
+  const article = await getArticleData(slug);
 
   if (!article) {
     notFound();
@@ -80,14 +84,14 @@ export default async function ArticlePage({ params }: Props) {
     "dateModified": article.updatedAt,
     "author": {
       "@type": "Organization",
-      "name": "申冷物流"
+      "name": shenlengCompany.brandName
     },
     "publisher": {
       "@type": "Organization",
-      "name": "上海申冷国际物流有限公司",
+      "name": shenlengCompany.legalName,
       "logo": {
         "@type": "ImageObject",
-        "url": "https://www.sl-cold.com/logo.png"
+        "url": absoluteUrl("/images/gong-si-jian-jie-content-3.JPG")
       }
     }
   };
@@ -124,7 +128,7 @@ export default async function ArticlePage({ params }: Props) {
             <div 
               className="legacy-article-content prose prose-lg prose-slate max-w-none 
                 prose-img:rounded-2xl prose-img:shadow-lg prose-table:border prose-table:border-slate-200"
-              dangerouslySetInnerHTML={{ __html: article.legacyHtml }} 
+              dangerouslySetInnerHTML={{ __html: article.legacyHtml || "" }}
             />
           ) : (
             // 这里以后对接 Lexical 渲染器

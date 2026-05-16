@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/fix-standalone-pnpm-links.mjs",
     "start": "next start",
     "lint": "eslint",
     "generate:importmap": "PAYLOAD_CONFIG_PATH=src/payload.config.ts payload generate:importmap",
@@ -13,9 +13,11 @@
     "schema:sync": "NODE_ENV=development PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/build-init.ts",
     "analytics:prune": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/prune-visitor-events.ts",
     "analytics:report": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/marketing-report.ts",
-    "smoke:post-deploy": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/post-deploy-smoke.ts"
+    "smoke:post-deploy": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/post-deploy-smoke.ts",
+    "test:readiness": "playwright test tests/site-readiness.spec.ts"
   },
   "dependencies": {
+    "@libsql/client": "0.14.0",
     "@payloadcms/db-sqlite": "^3.69.0",
     "@payloadcms/email-nodemailer": "^3.69.0",
     "@payloadcms/next": "^3.69.0",
@@ -24,6 +26,7 @@
     "@types/nodemailer": "^7.0.4",
     "clsx": "^2.1.1",
     "graphql": "^16.8.1",
+    "libsql": "0.4.7",
     "lucide-react": "^0.562.0",
     "next": "15.4.10",
     "nodemailer": "^7.0.12",

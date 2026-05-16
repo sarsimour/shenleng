@@ -6,6 +6,9 @@ import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 export const metadata: Metadata = {
   title: "联系我们 - 申冷物流",
   description: "上海申冷国际物流有限公司联系方式，电话、邮箱、地址等。",
+  alternates: {
+    canonical: "/contact",
+  },
 };
 
 export default function ContactPage() {
@@ -42,8 +45,22 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <p className="text-white/70 text-sm mb-1">电话</p>
-                  <p className="font-semibold text-lg">021-38930219</p>
-                  <p className="font-semibold text-lg">021-50673637</p>
+                  <a
+                    href="tel:021-38930219"
+                    data-analytics-target="contact_phone_primary"
+                    data-analytics-label="021-38930219"
+                    className="block font-semibold text-lg hover:text-white/80"
+                  >
+                    021-38930219
+                  </a>
+                  <a
+                    href="tel:021-50673637"
+                    data-analytics-target="contact_phone_secondary"
+                    data-analytics-label="021-50673637"
+                    className="block font-semibold text-lg hover:text-white/80"
+                  >
+                    021-50673637
+                  </a>
                 </div>
               </div>
 
@@ -53,8 +70,22 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <p className="text-white/70 text-sm mb-1">手机</p>
-                  <p className="font-semibold">180 2102 1686（销售总经理）</p>
-                  <p className="font-semibold">177 1701 0962</p>
+                  <a
+                    href="tel:18021021686"
+                    data-analytics-target="contact_mobile_sales"
+                    data-analytics-label="18021021686"
+                    className="block font-semibold hover:text-white/80"
+                  >
+                    180 2102 1686（销售总经理）
+                  </a>
+                  <a
+                    href="tel:17717010962"
+                    data-analytics-target="contact_mobile_backup"
+                    data-analytics-label="17717010962"
+                    className="block font-semibold hover:text-white/80"
+                  >
+                    177 1701 0962
+                  </a>
                 </div>
               </div>
 
@@ -64,8 +95,22 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <p className="text-white/70 text-sm mb-1">邮箱</p>
-                  <p className="font-semibold">wangyw@sl-cold.com</p>
-                  <p className="font-semibold">wanghh@sl-cold.com</p>
+                  <a
+                    href="mailto:wangyw@sl-cold.com"
+                    data-analytics-target="contact_email_primary"
+                    data-analytics-label="wangyw@sl-cold.com"
+                    className="block font-semibold hover:text-white/80"
+                  >
+                    wangyw@sl-cold.com
+                  </a>
+                  <a
+                    href="mailto:wanghh@sl-cold.com"
+                    data-analytics-target="contact_email_secondary"
+                    data-analytics-label="wanghh@sl-cold.com"
+                    className="block font-semibold hover:text-white/80"
+                  >
+                    wanghh@sl-cold.com
+                  </a>
                 </div>
               </div>
 

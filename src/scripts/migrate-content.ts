@@ -13,8 +13,6 @@ async function migrate() {
   const SOURCE_DIR = process.env.MIGRATION_SOURCE_DIR || path.resolve(__dirname, '../../data/nextjs_content')
   const ARTICLES_DIR = path.join(SOURCE_DIR, 'content/json')
   const IMAGES_DIR = path.join(SOURCE_DIR, 'public/images')
-  const REDIRECTS_DIR = process.env.REDIRECTS_OUTPUT_DIR || '/tmp'
-
   if (!fs.existsSync(ARTICLES_DIR)) {
     console.error(`❌ Error: Articles directory not found at ${ARTICLES_DIR}`)
     process.exit(1)
@@ -35,7 +33,7 @@ async function migrate() {
       })
       console.log('👤 Admin user created.')
     }
-  } catch (e) {
+  } catch {
     console.warn('⚠️ Admin check skipped.')
   }
 
@@ -92,8 +90,25 @@ async function migrate() {
             baseViews: parseInt(data.views || '0', 10),
             coverImage: mediaId,
             publishedAt: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
-            _status: 'published',
-            content: { root: { type: 'root', children: [{ type: 'paragraph', children: [{ text: 'Legacy article.', type: 'text' }] }] } }
+            content: {
+              root: {
+                type: 'root',
+                children: [
+                  {
+                    type: 'paragraph',
+                    children: [{ text: 'Legacy article.', type: 'text', version: 1 }],
+                    direction: 'ltr',
+                    format: '',
+                    indent: 0,
+                    version: 1,
+                  },
+                ],
+                direction: 'ltr',
+                format: '',
+                indent: 0,
+                version: 1,
+              },
+            }
           }
         })
         console.log(`✅ Success: ${data.title}`)

@@ -4,7 +4,7 @@ export const VisitorEvents: CollectionConfig = {
   slug: "visitorEvents",
   admin: {
     useAsTitle: "path",
-    defaultColumns: ["path", "utmSource", "referrerHost", "createdAt"],
+    defaultColumns: ["eventType", "path", "target", "utmSource", "referrerHost", "createdAt"],
     group: "Analytics",
   },
   access: {
@@ -14,6 +14,30 @@ export const VisitorEvents: CollectionConfig = {
     delete: ({ req }) => Boolean(req.user),
   },
   fields: [
+    {
+      name: "eventType",
+      type: "text",
+      required: true,
+      defaultValue: "pageview",
+      index: true,
+      label: "Event Type",
+    },
+    {
+      name: "target",
+      type: "text",
+      index: true,
+      label: "Target",
+    },
+    {
+      name: "label",
+      type: "text",
+      label: "Label",
+    },
+    {
+      name: "value",
+      type: "number",
+      label: "Value",
+    },
     {
       name: "path",
       type: "text",

@@ -1,14 +1,37 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
 import { Calendar, ArrowRight, Clock } from "lucide-react";
 import { getPayload } from "payload";
 import config from "@/payload.config";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "行业洞察与动态 - 申冷物流",
+  description:
+    "申冷物流行业洞察与动态，分享港口冷藏集装箱运输、冷链执行、车队管理、温控风险和物流服务方法论。",
+  keywords: "冷链物流文章,冷藏集装箱运输,港口冷运,冷箱车队,申冷物流动态",
+  alternates: {
+    canonical: "/articles",
+  },
+};
+
+type ArticleIndexItem = {
+  id: string | number;
+  title: string;
+  slug: string;
+  summary?: string | null;
+  publishedAt?: string | null;
+  baseViews?: number | null;
+  coverImage?: {
+    filename?: string | null;
+  } | null;
+};
+
 export default async function ArticlesIndex() {
-  let articles: any[] = [];
+  let articles: ArticleIndexItem[] = [];
   try {
     const payload = await getPayload({ config });
     const result = await payload.find({
@@ -17,7 +40,7 @@ export default async function ArticlesIndex() {
       limit: 50,
       depth: 1, // 确保获取 Media 对象的完整数据
     });
-    articles = result.docs;
+    articles = result.docs as unknown as ArticleIndexItem[];
   } catch (error) {
     console.warn("[articles] index fallback to empty list", error);
   }
@@ -35,7 +58,7 @@ export default async function ArticlesIndex() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {articles.map((article: any) => {
+          {articles.map((article) => {
             const dateStr = article.publishedAt 
               ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
               : "";

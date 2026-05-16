@@ -37,9 +37,17 @@ async function run() {
             children: [
               {
                 type: "paragraph",
-                children: [{ type: "text", text: "Smoke article body." }],
+                children: [{ type: "text", text: "Smoke article body.", version: 1 }],
+                direction: "ltr",
+                format: "",
+                indent: 0,
+                version: 1,
               },
             ],
+            direction: "ltr",
+            format: "",
+            indent: 0,
+            version: 1,
           },
         },
         publishedAt: new Date().toISOString(),

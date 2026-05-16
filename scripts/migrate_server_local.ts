@@ -57,9 +57,9 @@ async function main() {
   const DEFAULT_CONTENT = {
     root: {
       type: 'root',
-      children: [{ type: 'paragraph', children: [{ type: 'text', detail: 0, format: 0, mode: 'normal', style: '', text: '（历史文章归档）', version: 1 }], direction: 'ltr', format: '', indent: 0, textFormat: 0, version: 1 }],
-      direction: 'ltr',
-      format: '',
+      children: [{ type: 'paragraph', children: [{ type: 'text', detail: 0, format: 0, mode: 'normal', style: '', text: '（历史文章归档）', version: 1 }], direction: 'ltr' as const, format: '' as const, indent: 0, textFormat: 0, version: 1 }],
+      direction: 'ltr' as const,
+      format: '' as const,
       indent: 0,
       version: 1,
     },

@@ -2,8 +2,8 @@
 
 ## 1. 当前代码侧已完成
 - 新增访客事件集合：`visitorEvents`（Payload CMS）。
-- 新增采集接口：`POST /api/track/pageview`。
-- 新增前端埋点：全站页面访问自动上报（路径、来源、UTM、会话 ID、匿名 IP Hash、UA）。
+- 新增采集接口：`POST /api/track/pageview`（兼容页面访问与站内转化事件）。
+- 新增前端埋点：全站页面访问自动上报（路径、来源、UTM、会话 ID、匿名 IP Hash、UA），并记录电话、邮箱、AI 客服、关键 CTA 点击。
 - 新增建表脚本：`pnpm schema:sync`（用于首次部署后同步 SQLite schema）。
 - 新增数据清理脚本：`pnpm analytics:prune`，默认保留 `180` 天。
 - 新增营销分析脚本：`pnpm analytics:report -- --days=7`（生成营销分析摘要，可邮件/Webhook发送）。
@@ -54,6 +54,7 @@
 - 看渠道：按 `utmSource / utmMedium / utmCampaign` 过滤。
 - 看入口页：按 `path` 聚合（可后续加 BI）。
 - 看外部来源：按 `referrerHost` 过滤（搜索/社媒/直接访问）。
+- 看转化：按 `eventType / target` 过滤（如 `phone_click`、`chat_open`、`chat_unavailable`）。
 
 ## 5. 营销分析报告（邮件/Webhook）
 - 生成近 7 天报告：`pnpm analytics:report -- --days=7`
