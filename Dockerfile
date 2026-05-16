@@ -35,6 +35,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/src/payload.config.ts ./src/payload.config.ts
 COPY --from=builder /app/src/collections ./src/collections
 COPY --from=builder /app/src/scripts ./src/scripts
+COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/src/app/sitemap.ts ./src/app/sitemap.ts
 
 # 复制完整生产依赖，确保运行时脚本 (schema/smoke) 可执行
