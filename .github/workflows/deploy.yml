@@ -1,9 +1,13 @@
-name: Deploy Shenleng (Build on ECS)
+name: Deploy Shenleng (GH Build → ACR → ECS Pull)
 
 on:
   push:
     branches: ["master"]
   workflow_dispatch:
+
+env:
+  ACR_REGISTRY: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com
+  IMAGE_NAME: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
 
 jobs:
   build-and-deploy:
@@ -12,81 +16,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 在 Runner 上打包源码（排除 node_modules / .next / .git 等）
-      #    ECS 无法访问 github.com，所以由 Actions 把源码送过去再本地 build
-      - name: Create source tarball
-        run: |
-          tar \
-            --exclude='./node_modules' \
-            --exclude='./.next' \
-            --exclude='./.git' \
-            --exclude='./.github' \
-            --exclude='./conductor' \
-            --exclude='./tests' \
-            --exclude='./test-results' \
-            --exclude='./persistence' \
-            --exclude='./directus_data' \
-            --exclude='./data' \
-            --exclude='./output' \
-            --exclude='./database' \
-            --exclude='./.env' \
-            --exclude='./.env.*' \
-            --exclude='./payload.db' \
-            --exclude='./payload-test.db' \
-            --exclude='./.pnpm-store' \
-            --exclude='./tsconfig.tsbuildinfo' \
-            --exclude='./shenleng-source.tar.gz' \
-            -czf /tmp/shenleng-source.tar.gz .
-          mv /tmp/shenleng-source.tar.gz ./shenleng-source.tar.gz
-          ls -lh ./shenleng-source.tar.gz
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # 2. 传输源码 tarball 到服务器 (scp-action 在容器里跑，source 必须在 workspace 下)
-      - name: Upload source to ECS
+      # ECS 仅 1.6GB RAM 无法 build；ACR 个人版的 GitHub 源构建也不可靠。
+      # 这里改在 GH Runner 上 build（7GB RAM 充足）并推到 ACR，ECS 同 region 拉镜像。
+      - name: Log in to Alibaba Cloud ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push image to ACR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}
+          # 个人版 ACR 不支持 manifest list，限定单架构
+          platforms: linux/amd64
+          # 用 GH Actions 的 cache，缩短后续 build 时间
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 同步运行时配置到 ECS
+      - name: Copy configs to ECS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 10m
-          source: "shenleng-source.tar.gz"
-          target: "/tmp/"
+          timeout: 5m
+          source: "docker-compose.yml,nginx.conf"
+          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
 
-      # 3. 在 ECS 上解压并构建
-      - name: Build and deploy on ECS
+      - name: Pull image and restart container on ECS
         uses: appleboy/ssh-action@v1.0.3
         env:
+          ACR_REGISTRY: ${{ env.ACR_REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 20m
-          command_timeout: 30m
-          envs: PAYLOAD_SECRET,VERSECORE_API_BASE_URL
+          timeout: 10m
+          command_timeout: 15m
+          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL
           script: |
             set -e
 
+            : "${ACR_REGISTRY:?ACR_REGISTRY is required}"
+            : "${IMAGE_NAME:?IMAGE_NAME is required}"
+            : "${ACR_USERNAME:?ACR_USERNAME is required}"
+            : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
             : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
 
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-            mkdir -p "$PROJECT_DIR"
             cd "$PROJECT_DIR"
 
             echo "📁 Ensuring persistence directories..."
             mkdir -p persistence/sqlite persistence/media
             chmod -R 777 persistence/
 
-            echo "📦 Extracting source (preserves persistence/ since it's not in tarball)..."
-            # 排除 persistence/、.env 之类的运行时数据
-            tar -xzf /tmp/shenleng-source.tar.gz -C "$PROJECT_DIR"
-            rm -f /tmp/shenleng-source.tar.gz
-
-            echo "🧹 Reclaiming Docker disk space before build..."
+            echo "🧹 Reclaiming Docker disk space before pull..."
             docker container prune -f || true
             docker image prune -f || true
-            docker builder prune -af || true
             df -h /
+
+            echo "🔐 Logging into Alibaba Cloud ACR..."
+            printf '%s' "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
+
+            echo "📥 Pulling latest image..."
+            docker pull "$IMAGE_NAME"
 
             echo "🧾 Writing runtime environment..."
             if [ -z "$VERSECORE_API_BASE_URL" ]; then
@@ -99,9 +105,6 @@ jobs:
             VERSECORE_API_BASE_URL=$VERSECORE_API_BASE_URL
             EOF
             mv .env.tmp .env
-
-            echo "🔨 Building image on ECS..."
-            docker compose build web
 
             echo "🚀 Recreating container with new image..."
             docker compose up -d --remove-orphans --force-recreate

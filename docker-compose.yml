@@ -1,9 +1,8 @@
 services:
   web:
     container_name: shenleng-container
-    # 直接在 ECS 上构建（ECS 无法访问 github.com，所以源码由 GH Actions scp 上来后本地 build）
-    build: .
-    image: shenleng:latest
+    # GH Actions 在 Runner 上 build 并 push 到 ACR；ECS 仅拉镜像运行
+    image: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
