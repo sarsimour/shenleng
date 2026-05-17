@@ -1,14 +1,9 @@
-name: Deploy Shenleng (Docker + Alibaba Cloud ACR)
+name: Deploy Shenleng (Build on ECS)
 
 on:
   push:
     branches: ["master"]
   workflow_dispatch:
-
-env:
-  # 阿里云容器镜像服务 - 个人版实例
-  ACR_REGISTRY: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com
-  IMAGE_NAME: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
 
 jobs:
   build-and-deploy:
@@ -17,25 +12,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 传输运行配置到服务器
-      - name: Copy configs to server
+      # 1. 在 Runner 上打包源码（排除 node_modules / .next / .git 等）
+      #    ECS 无法访问 github.com，所以由 Actions 把源码送过去再本地 build
+      - name: Create source tarball
+        run: |
+          tar \
+            --exclude='./node_modules' \
+            --exclude='./.next' \
+            --exclude='./.git' \
+            --exclude='./.github' \
+            --exclude='./conductor' \
+            --exclude='./tests' \
+            --exclude='./test-results' \
+            --exclude='./persistence' \
+            --exclude='./directus_data' \
+            --exclude='./data' \
+            --exclude='./output' \
+            --exclude='./database' \
+            --exclude='./.env' \
+            --exclude='./.env.*' \
+            --exclude='./payload.db' \
+            --exclude='./payload-test.db' \
+            --exclude='./.pnpm-store' \
+            --exclude='./tsconfig.tsbuildinfo' \
+            -czf /tmp/shenleng-source.tar.gz .
+          ls -lh /tmp/shenleng-source.tar.gz
+
+      # 2. 传输源码 tarball 到服务器
+      - name: Upload source to ECS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 10m
-          source: "docker-compose.yml,nginx.conf"
-          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+          source: "/tmp/shenleng-source.tar.gz"
+          target: "/tmp/"
 
-      # 2. 阿里云 ACR 已绑定 GitHub 自动构建；这里仅等待新镜像并部署
-      - name: Deploy on ECS
+      # 3. 在 ECS 上解压并构建
+      - name: Build and deploy on ECS
         uses: appleboy/ssh-action@v1.0.3
         env:
-          ACR_REGISTRY: ${{ env.ACR_REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
         with:
@@ -44,65 +61,34 @@ jobs:
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 20m
           command_timeout: 30m
-          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL
+          envs: PAYLOAD_SECRET,VERSECORE_API_BASE_URL
           script: |
             set -e
 
-            : "${ACR_REGISTRY:?ACR_REGISTRY is required}"
-            : "${IMAGE_NAME:?IMAGE_NAME is required}"
-            : "${ACR_USERNAME:?ACR_USERNAME is required}"
-            : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
             : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
-            
+
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
+            mkdir -p "$PROJECT_DIR"
             cd "$PROJECT_DIR"
 
-            cleanup_docker_space() {
-              echo "🧹 Cleaning up dangling Docker images..."
-              docker image prune -f || true
-              df -h / || true
-            }
-            trap cleanup_docker_space EXIT
-
-            echo "📁 Preparing directories..."
-            mkdir -p persistence/sqlite
-            mkdir -p persistence/media
+            echo "📁 Ensuring persistence directories..."
+            mkdir -p persistence/sqlite persistence/media
             chmod -R 777 persistence/
 
-            echo "🧹 Reclaiming safe Docker disk space before deploy..."
+            echo "📦 Extracting source (preserves persistence/ since it's not in tarball)..."
+            # 排除 persistence/、.env 之类的运行时数据
+            tar -xzf /tmp/shenleng-source.tar.gz -C "$PROJECT_DIR"
+            rm -f /tmp/shenleng-source.tar.gz
+
+            echo "🧹 Reclaiming Docker disk space before build..."
             docker container prune -f || true
             docker image prune -f || true
             docker builder prune -af || true
             df -h /
-            
-            echo "🔐 Logging into Alibaba Cloud ACR..."
-            printf '%s' "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
-            
-            echo "📥 Waiting for Alibaba Cloud ACR automated build..."
-            previous_digest="$(docker image inspect "$IMAGE_NAME" --format '{{index .RepoDigests 0}}' 2>/dev/null | sed 's/.*@//' || true)"
-            current_digest=""
-            for attempt in $(seq 1 60); do
-              docker pull "$IMAGE_NAME"
-              current_digest="$(docker image inspect "$IMAGE_NAME" --format '{{index .RepoDigests 0}}' 2>/dev/null | sed 's/.*@//' || true)"
-              if [ -n "$current_digest" ] && [ "$current_digest" != "$previous_digest" ]; then
-                echo "New ACR image digest: $current_digest"
-                break
-              fi
-              echo "ACR image not updated yet (${attempt}/60). Waiting 20s..."
-              sleep 20
-            done
-            if [ -z "$current_digest" ] || [ "$current_digest" = "$previous_digest" ]; then
-              echo "ACR automated build did not publish a new image before timeout." >&2
-              exit 1
-            fi
 
             echo "🧾 Writing runtime environment..."
             if [ -z "$VERSECORE_API_BASE_URL" ]; then
               VERSECORE_API_BASE_URL="http://versecore-api:9000"
-            fi
-            if [ -z "$PAYLOAD_SECRET" ]; then
-              echo "PAYLOAD_SECRET is required." >&2
-              exit 1
             fi
 
             umask 077
@@ -112,7 +98,10 @@ jobs:
             EOF
             mv .env.tmp .env
 
-            echo "🚀 Recreating container with latest image..."
+            echo "🔨 Building image on ECS..."
+            docker compose build web
+
+            echo "🚀 Recreating container with new image..."
             docker compose up -d --remove-orphans --force-recreate
 
             echo "🧱 Syncing database schema..."
@@ -120,8 +109,12 @@ jobs:
 
             echo "🧪 Running post-deploy smoke test..."
             docker compose exec -T -e SMOKE_BASE_URL="http://127.0.0.1:3000" web sh -c "cd /app && npm run smoke:post-deploy"
-            
+
             echo "🔄 Reloading Nginx..."
             sudo nginx -s reload || true
+
+            echo "🧹 Final dangling image cleanup..."
+            docker image prune -f || true
+            df -h /
 
             echo "✅ Deployment complete!"
