@@ -35,10 +35,12 @@ jobs:
             --exclude='./payload-test.db' \
             --exclude='./.pnpm-store' \
             --exclude='./tsconfig.tsbuildinfo' \
+            --exclude='./shenleng-source.tar.gz' \
             -czf /tmp/shenleng-source.tar.gz .
-          ls -lh /tmp/shenleng-source.tar.gz
+          mv /tmp/shenleng-source.tar.gz ./shenleng-source.tar.gz
+          ls -lh ./shenleng-source.tar.gz
 
-      # 2. 传输源码 tarball 到服务器
+      # 2. 传输源码 tarball 到服务器 (scp-action 在容器里跑，source 必须在 workspace 下)
       - name: Upload source to ECS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -46,7 +48,7 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 10m
-          source: "/tmp/shenleng-source.tar.gz"
+          source: "shenleng-source.tar.gz"
           target: "/tmp/"
 
       # 3. 在 ECS 上解压并构建
