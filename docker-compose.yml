@@ -15,3 +15,12 @@ services:
       - DATABASE_URI=file:/app/database/payload.db
       - VERSECORE_API_BASE_URL=${VERSECORE_API_BASE_URL:-http://versecore-api:9000}
       - PORT=3000
+    networks:
+      - slm-shared-net
+
+# 共享网络供 web 与 versecore-api 通信。需要 ECS 上先创建：
+#   docker network create slm-shared-net
+#   docker network connect slm-shared-net versecore-api
+networks:
+  slm-shared-net:
+    external: true
