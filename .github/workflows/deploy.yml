@@ -36,6 +36,10 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}
           # 个人版 ACR 不支持 manifest list，限定单架构
           platforms: linux/amd64
+          build-args: |
+            NEXT_PUBLIC_VERSECORE_APP_ID=${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID || 'logistics-web' }}
+            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME || '申冷售前顾问' }}
+            NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
           # 用 GH Actions 的 cache，缩短后续 build 时间
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -60,13 +64,16 @@ jobs:
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
+          NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 10m
           command_timeout: 15m
-          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL
+          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID
           script: |
             set -e
 
@@ -75,6 +82,7 @@ jobs:
             : "${ACR_USERNAME:?ACR_USERNAME is required}"
             : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
             : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
+            : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
 
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
@@ -98,11 +106,20 @@ jobs:
             if [ -z "$VERSECORE_API_BASE_URL" ]; then
               VERSECORE_API_BASE_URL="http://versecore-api:9000"
             fi
+            if [ -z "$NEXT_PUBLIC_VERSECORE_APP_ID" ]; then
+              NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"
+            fi
+            if [ -z "$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME" ]; then
+              NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="申冷售前顾问"
+            fi
 
             umask 077
             cat > .env.tmp <<EOF
             PAYLOAD_SECRET=$PAYLOAD_SECRET
             VERSECORE_API_BASE_URL=$VERSECORE_API_BASE_URL
+            NEXT_PUBLIC_VERSECORE_APP_ID=$NEXT_PUBLIC_VERSECORE_APP_ID
+            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME
+            NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID
             EOF
             mv .env.tmp .env
 

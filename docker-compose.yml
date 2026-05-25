@@ -14,6 +14,9 @@ services:
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - DATABASE_URI=file:/app/database/payload.db
       - VERSECORE_API_BASE_URL=${VERSECORE_API_BASE_URL:-http://versecore-api:9000}
+      - NEXT_PUBLIC_VERSECORE_APP_ID=${NEXT_PUBLIC_VERSECORE_APP_ID:-logistics-web}
+      - NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=${NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME:-申冷售前顾问}
+      - NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID}
       - PORT=3000
     networks:
       - slm-shared-net

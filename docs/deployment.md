@@ -38,6 +38,9 @@ GitHub Actions Runner（7GB RAM, AMD64）
 | `ECS_HOST` / `ECS_USER` / `ECS_SSH_KEY` | SSH 到 ECS 的凭据 |
 | `PAYLOAD_SECRET` | Payload CMS 加密 secret |
 | `VERSECORE_API_BASE_URL` | 可选，默认 `http://versecore-api:9000`（容器网络内） |
+| `NEXT_PUBLIC_LOGISTICS_CHATBOT_ID` | 必填，Next.js 构建时写入客户端的固定 VerseCore chatbot UUID |
+| `NEXT_PUBLIC_VERSECORE_APP_ID` | 可选，默认 `logistics-web` |
+| `NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME` | 可选，默认 `申冷售前顾问` |
 
 ## 触发方式
 
@@ -59,7 +62,7 @@ GitHub Actions Runner（7GB RAM, AMD64）
 
 - 项目目录：`/home/ecs-user/Projects/shenleng/`
 - 持久化卷：`./persistence/sqlite`、`./persistence/media`（不在镜像里，不会被覆盖）
-- `.env` 由 workflow 写入，包含 `PAYLOAD_SECRET` 和 `VERSECORE_API_BASE_URL`
+- `.env` 由 workflow 写入，包含 `PAYLOAD_SECRET`、`VERSECORE_API_BASE_URL` 和 AI 助手公开配置
 
 ## 磁盘维护
 
