@@ -7,7 +7,7 @@
 
 若未配置 `VERSECORE_API_BASE_URL`：
 - 开发环境默认：`http://127.0.0.1:8000`
-- 生产环境默认：`https://api.finverse.top/v2`
+- 生产环境默认：`http://versecore-api:9000`（ECS Docker 共享网络内）
 
 ## 2) 本地联通
 1. 启动 VerseCore：
@@ -22,13 +22,13 @@ pnpm dev
 ```
 3. 验证代理：
 ```bash
-curl -i http://127.0.0.1:3000/api/proxy/health
+curl -i -X POST http://127.0.0.1:3000/api/proxy/users/anonymous
 ```
 
 ## 3) 服务器联通
 1. 在服务器项目 `.env` 增加：
 ```env
-VERSECORE_API_BASE_URL=https://api.finverse.top/v2
+VERSECORE_API_BASE_URL=http://versecore-api:9000
 ```
 2. 重启容器：
 ```bash
@@ -37,7 +37,7 @@ docker compose up -d
 ```
 3. 容器内验证：
 ```bash
-docker compose exec -T web sh -lc "curl -i http://127.0.0.1:3000/api/proxy/health"
+docker compose exec -T web sh -lc "curl -i -X POST http://127.0.0.1:3000/api/proxy/users/anonymous"
 ```
 
 ## 4) 匿名用户模式
@@ -50,6 +50,8 @@ docker compose exec -T web sh -lc "curl -i http://127.0.0.1:3000/api/proxy/healt
 ## 5) 多前端共享后端时的 app 信息
 前端现在会在请求头中自动携带：
 - `X-App-ID: logistics-web`（可通过环境变量覆盖）
+
+`/api/proxy/*` 会由服务端固定写入 `X-App-ID`，浏览器传入的同名请求头会被丢弃，避免访客伪造其他 app scope。
 
 可选环境变量：
 ```env
@@ -72,20 +74,5 @@ NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=<必填，固定目标 chatbot 的 UUID>
 - `PUT /knowledge/update_doc`
 - `DELETE /knowledge/delete_doc`
 
-## 7) 知识检索调试接口（后端）
-新增用于验证召回效果的接口：
-- `POST /knowledge/retrieve_debug`
-
-请求体：
-```json
-{
-  "org_id": "<组织 UUID>",
-  "query": "用户问题",
-  "top_k": 4
-}
-```
-
-返回包含：
-- `access_levels`
-- `hit_count`
-- `documents`（`content/type/name/file_path`）
+## 7) 代理边界
+官网代理只允许匿名登录、固定 chatbot 会话、消息发送，以及知识库管理页面需要的 CRUD 路由。后端健康检查和知识检索调试接口请在 VerseCore 内部网络或后台工具里直接访问，不经过公网官网代理。

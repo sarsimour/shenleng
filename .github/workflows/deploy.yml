@@ -40,6 +40,7 @@ jobs:
             NEXT_PUBLIC_VERSECORE_APP_ID=${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID || 'logistics-web' }}
             NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME || '申冷售前顾问' }}
             NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
+            NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
           # 用 GH Actions 的 cache，缩短后续 build 时间
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -67,13 +68,14 @@ jobs:
           NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID }}
           NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME }}
           NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 10m
           command_timeout: 15m
-          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID
+          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID,NEXT_PUBLIC_SITE_URL
           script: |
             set -e
 
@@ -83,6 +85,7 @@ jobs:
             : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
             : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
             : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
+            : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
 
             PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
             cd "$PROJECT_DIR"
@@ -120,6 +123,7 @@ jobs:
             NEXT_PUBLIC_VERSECORE_APP_ID=$NEXT_PUBLIC_VERSECORE_APP_ID
             NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME
             NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID
+            NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
             EOF
             mv .env.tmp .env
 

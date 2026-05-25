@@ -20,6 +20,13 @@ const REQUIRED_CHATBOT_ID = process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID?.trim()
 const CONFIGURED_CHATBOT_NAME =
   process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME?.trim() || "申冷售前顾问";
 
+function buildMessageAnalyticsLabel(message: string): string {
+  const length = [...message].length;
+  if (length <= 20) return "text_length:1-20";
+  if (length <= 80) return "text_length:21-80";
+  return "text_length:81+";
+}
+
 export function ChatWindow() {
   const { closeChat } = useChat();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
@@ -109,13 +116,15 @@ export function ChatWindow() {
     trackSiteEvent({
       eventType: "chat_message_sent",
       target: "chat_window",
-      label: userMsg.slice(0, 80),
+      label: buildMessageAnalyticsLabel(userMsg),
+      value: [...userMsg].length,
     });
 
     try {
       // Add placeholder for AI response
       setMessages((prev) => [...prev, { role: "ai", content: "" }]);
 
+      const startedAt = performance.now();
       const stream = sendMessageStream(chatbot.id, sessionId, userMsg);
       
       let fullContent = "";
@@ -131,6 +140,14 @@ export function ChatWindow() {
           return newMsgs;
         });
       }
+
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      trackSiteEvent({
+        eventType: fullContent.trim() ? "chat_response_completed" : "chat_empty_response",
+        target: "chat_window",
+        label: fullContent.trim() ? "ok" : "empty",
+        value: elapsedMs,
+      });
     } catch (err) {
       console.error(err);
       trackSiteEvent({

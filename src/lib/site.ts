@@ -1,4 +1,7 @@
-export const DEFAULT_SITE_URL = "https://www.finverse.top";
+export const DEFAULT_SITE_URL = "http://localhost:3000";
+
+const MISSING_SITE_URL_MESSAGE =
+  "NEXT_PUBLIC_SITE_URL is required in production so canonical, sitemap, robots, and JSON-LD use the same public origin.";
 
 function trimTrailingSlash(value: string): string {
   return value.trim().replace(/\/+$/, "");
@@ -6,7 +9,15 @@ function trimTrailingSlash(value: string): string {
 
 export function getSiteUrl(): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return configured ? trimTrailingSlash(configured) : DEFAULT_SITE_URL;
+  if (configured) {
+    return trimTrailingSlash(configured);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(MISSING_SITE_URL_MESSAGE);
+  }
+
+  return DEFAULT_SITE_URL;
 }
 
 export function absoluteUrl(path = "/"): string {

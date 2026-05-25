@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const baseURL = process.env.TEST_BASE_URL || "http://localhost:3010";
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.finverse.top").replace(/\/+$/, "");
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
 const dbPath = path.resolve(process.cwd(), "database/payload.db");
 
 function sqlite(query: string): string {

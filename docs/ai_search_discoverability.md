@@ -1,10 +1,11 @@
 # AI 搜索与站点可发现性说明
 
-本项目在不迁移域名的前提下，先把官网做成更容易被搜索引擎和 AI 搜索读取的结构。
+本项目在测试域名阶段先把官网做成更容易被搜索引擎和 AI 搜索读取的结构。所有公开 URL 必须从同一个 `NEXT_PUBLIC_SITE_URL` 生成，避免 canonical、sitemap、robots 和 JSON-LD 互相打架。
 
 ## 已实现机制
 
 - 统一站点 URL：`src/lib/site.ts` 集中管理 `NEXT_PUBLIC_SITE_URL`，避免 canonical、sitemap、robots、JSON-LD 各写各的。
+- Host 规范化：生产环境中 `src/middleware.ts` 会把非规范 Host 的 GET/HEAD 请求 308 跳转到 `NEXT_PUBLIC_SITE_URL`。
 - Canonical：公开页面输出规范链接，减少旧域名、新域名、临时域名之间的重复页信号。
 - Baidu 站点验证：配置 `NEXT_PUBLIC_BAIDU_SITE_VERIFICATION` 后，页面会输出 `baidu-site-verification` meta。
 - Sitemap：`/sitemap.xml` 持续列出公开页面和文章。
@@ -15,11 +16,11 @@
 ## 上线前配置
 
 ```bash
-NEXT_PUBLIC_SITE_URL=https://www.finverse.top
+NEXT_PUBLIC_SITE_URL=https://shenleng.roinland.com
 NEXT_PUBLIC_BAIDU_SITE_VERIFICATION=<百度搜索资源平台给出的验证 token>
 ```
 
-等正式替换旧站域名时，只需要把 `NEXT_PUBLIC_SITE_URL` 改成最终官网域名并重新构建部署。
+`NEXT_PUBLIC_SITE_URL` 是生产构建必填项。等正式替换测试域名时，只需要把 GitHub Secret / 部署环境里的 `NEXT_PUBLIC_SITE_URL` 改成最终官网域名并重新构建部署；不要在代码里写死测试域名或旧域名。
 
 ## 面向“豆包类 AI 搜索”的内容策略
 
