@@ -15,6 +15,17 @@ const HOP_BY_HOP_HEADERS = new Set([
 
 const SERVER_APP_ID = process.env.NEXT_PUBLIC_VERSECORE_APP_ID?.trim() || "logistics-web";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+type RateLimitRule = {
+  limit: number;
+  name: string;
+};
+
+type RateLimitBucket = {
+  count: number;
+  resetAt: number;
+};
 
 const KNOWLEDGE_ROUTES = new Map<string, Set<string>>([
   ["GET", new Set(["knowledge/get_docs", "users/me/organization"])],
@@ -22,6 +33,14 @@ const KNOWLEDGE_ROUTES = new Map<string, Set<string>>([
   ["PUT", new Set(["knowledge/update_doc"])],
   ["DELETE", new Set(["knowledge/delete_doc"])],
 ]);
+
+const RATE_LIMITS = {
+  anonymous: { limit: 8, name: "anonymous_user_creation" },
+  chatStart: { limit: 15, name: "chat_session_start" },
+  chatMessage: { limit: 20, name: "chat_message_send" },
+} satisfies Record<string, RateLimitRule>;
+
+const rateLimitStore = new Map<string, RateLimitBucket>();
 
 function normalizeBaseURL(raw: string | undefined): string {
   if (!raw) return "";
@@ -98,6 +117,86 @@ function isAllowedProxyRoute(method: string, pathSegments: string[]): boolean {
   return isAllowedChatbotRoute(method, pathSegments);
 }
 
+function getClientIdentifier(req: NextRequest): string {
+  const cfConnectingIp = req.headers.get("cf-connecting-ip")?.trim();
+  if (cfConnectingIp) return cfConnectingIp;
+
+  const xRealIp = req.headers.get("x-real-ip")?.trim();
+  if (xRealIp) return xRealIp;
+
+  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwardedFor || "unknown";
+}
+
+function getRateLimitRule(method: string, pathSegments: string[]): RateLimitRule | null {
+  const normalizedPath = pathSegments.join("/");
+  if (method === "POST" && normalizedPath === "users/anonymous") {
+    return RATE_LIMITS.anonymous;
+  }
+
+  const [resource, chatbotId, chat, sessionId] = pathSegments;
+  if (resource !== "chatbots" || !isUuid(chatbotId) || chat !== "chat") {
+    return null;
+  }
+
+  if (method === "POST" && sessionId === "start" && pathSegments.length === 4) {
+    return RATE_LIMITS.chatStart;
+  }
+
+  if (method === "POST" && isUuid(sessionId) && pathSegments.length === 4) {
+    return RATE_LIMITS.chatMessage;
+  }
+
+  return null;
+}
+
+function pruneExpiredRateLimitBuckets(now: number) {
+  if (rateLimitStore.size < 1000) return;
+
+  for (const [key, bucket] of rateLimitStore.entries()) {
+    if (bucket.resetAt <= now) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
+function applyRateLimit(req: NextRequest, method: string, pathSegments: string[]): NextResponse | null {
+  const rule = getRateLimitRule(method, pathSegments);
+  if (!rule) return null;
+
+  const now = Date.now();
+  pruneExpiredRateLimitBuckets(now);
+
+  const key = `${rule.name}:${getClientIdentifier(req)}`;
+  const current = rateLimitStore.get(key);
+  const bucket =
+    current && current.resetAt > now
+      ? current
+      : { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+
+  bucket.count += 1;
+  rateLimitStore.set(key, bucket);
+
+  if (bucket.count <= rule.limit) {
+    return null;
+  }
+
+  const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  return NextResponse.json(
+    {
+      error: "VERSECORE_PROXY_RATE_LIMITED",
+      limit: rule.name,
+      retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
+  );
+}
+
 async function proxy(req: NextRequest, pathSegments: string[]) {
   const baseURLs = resolveBackendBaseURL();
   const method = req.method.toUpperCase();
@@ -111,6 +210,11 @@ async function proxy(req: NextRequest, pathSegments: string[]) {
       { error: "VERSECORE_PROXY_ROUTE_BLOCKED" },
       { status: 404 },
     );
+  }
+
+  const rateLimitResponse = applyRateLimit(req, method, pathSegments);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const headers = buildForwardHeaders(req);

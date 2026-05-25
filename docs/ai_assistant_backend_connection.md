@@ -53,6 +53,13 @@ docker compose exec -T web sh -lc "curl -i -X POST http://127.0.0.1:3000/api/pro
 
 `/api/proxy/*` 会由服务端固定写入 `X-App-ID`，浏览器传入的同名请求头会被丢弃，避免访客伪造其他 app scope。
 
+公网入口还在代理层按访客 IP 做小时级限流：
+- `POST /users/anonymous`：每小时 8 次，限制清 localStorage 反复新建匿名账号。
+- `POST /chatbots/{id}/chat/start`：每小时 15 次。
+- `POST /chatbots/{id}/chat/{session_id}`：每小时 20 次。
+
+VerseCore 后端仍保留匿名账号自身的能量配额，代理限流只是第一道公网保护。
+
 可选环境变量：
 ```env
 NEXT_PUBLIC_VERSECORE_APP_ID=logistics-web
