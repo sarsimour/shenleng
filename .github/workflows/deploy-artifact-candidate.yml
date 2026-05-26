@@ -51,7 +51,7 @@ jobs:
           mkdir -p artifact-root/.next
           rsync -a .next/standalone/ artifact-root/
           rsync -a .next/static/ artifact-root/.next/static/
-          rsync -a --exclude media public/ artifact-root/public/
+          rsync -a --exclude media --exclude images public/ artifact-root/public/
           mkdir -p artifact-root/src/app
           rsync -a src/payload.config.ts src/payload-types.ts artifact-root/src/
           rsync -a src/collections artifact-root/src/
@@ -147,8 +147,22 @@ jobs:
             mkdir -p "$RELEASE_DIR" "$LOG_DIR"
             tar -xzf "$UPLOAD_DIR/$ARTIFACT_NAME" -C "$RELEASE_DIR"
             mkdir -p "$RELEASE_DIR/database" "$RELEASE_DIR/public"
+
+            if [ ! -d "$PROJECT_DIR/persistence/images" ]; then
+              echo "Creating persistent public/images copy from live container..."
+              rm -rf "$PROJECT_DIR/persistence/images.tmp"
+              if docker cp shenleng-container:/app/public/images "$PROJECT_DIR/persistence/images.tmp" 2>/dev/null; then
+                mv "$PROJECT_DIR/persistence/images.tmp" "$PROJECT_DIR/persistence/images"
+              else
+                echo "WARN: live container images copy failed; creating empty persistence/images." >&2
+                mkdir -p "$PROJECT_DIR/persistence/images"
+              fi
+            fi
+
             rm -rf "$RELEASE_DIR/public/media"
+            rm -rf "$RELEASE_DIR/public/images"
             ln -s "$PROJECT_DIR/persistence/media" "$RELEASE_DIR/public/media"
+            ln -s "$PROJECT_DIR/persistence/images" "$RELEASE_DIR/public/images"
 
             if [ -f "$PROJECT_DIR/persistence/sqlite/payload.db" ]; then
               cp "$PROJECT_DIR/persistence/sqlite/payload.db" "$RELEASE_DIR/database/payload-candidate.db"
