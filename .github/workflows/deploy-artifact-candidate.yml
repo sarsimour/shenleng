@@ -75,14 +75,41 @@ jobs:
           echo "artifact_size=$(du -h "$ARTIFACT_NAME" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact package to ECS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 10m
-          source: ${{ env.ARTIFACT_NAME }}
-          target: /home/${{ secrets.ECS_USER }}/Projects/shenleng/artifact-uploads/${{ github.run_id }}
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+          ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          : "${ECS_HOST:?ECS_HOST is required}"
+          : "${ECS_USER:?ECS_USER is required}"
+          : "${ECS_SSH_KEY:?ECS_SSH_KEY is required}"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ECS_SSH_KEY" > ~/.ssh/shenleng-ecs
+          chmod 600 ~/.ssh/shenleng-ecs
+
+          ssh_opts=(
+            -i ~/.ssh/shenleng-ecs
+            -o BatchMode=yes
+            -o ConnectTimeout=30
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+          )
+          remote_dir="/home/$ECS_USER/Projects/shenleng/artifact-uploads/${GITHUB_RUN_ID}"
+
+          echo "=== Native SSH preflight ==="
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" "mkdir -p '$remote_dir' && df -h / && free -h"
+
+          echo "=== Native SCP upload ==="
+          ls -lh "$ARTIFACT_NAME"
+          /usr/bin/time -v timeout 8m scp -O "${ssh_opts[@]}" "$ARTIFACT_NAME" "$ECS_USER@$ECS_HOST:$remote_dir/"
+
+          echo "=== Remote upload verification ==="
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" "ls -lh '$remote_dir/$ARTIFACT_NAME' && du -sh '$remote_dir'"
 
       - name: Start candidate, measure resources, validate, stop
         uses: appleboy/ssh-action@v1.0.3
