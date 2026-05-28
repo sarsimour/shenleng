@@ -8,6 +8,7 @@ import {
   startChatSession,
   sendMessageStream,
   getChatbot,
+  getChatHistory,
   getChatbotAvatarUrl,
   Chatbot,
 } from "@/lib/chatbot-api";
@@ -39,9 +40,11 @@ function buildMessageAnalyticsLabel(message: string): string {
   return "text_length:81+";
 }
 
+type ChatWindowMessage = { role: "user" | "ai" | "system"; content: string };
+
 export function ChatWindow() {
   const { closeChat } = useChat();
-  const [messages, setMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
+  const [messages, setMessages] = useState<ChatWindowMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [responseStatus, setResponseStatus] = useState<string>(RESPONSE_STATUS_STEPS[0].text);
@@ -113,6 +116,15 @@ export function ChatWindow() {
           });
         const sid = await startChatSession(REQUIRED_CHATBOT_ID);
         setSessionId(sid);
+        void getChatHistory(REQUIRED_CHATBOT_ID, sid)
+          .then((history) => {
+            if (history.length > 0) {
+              setMessages(history.map(({ role, content }) => ({ role, content })));
+            }
+          })
+          .catch((historyError) => {
+            console.warn("Failed to fetch chat history", historyError);
+          });
         trackSiteEvent({
           eventType: "chat_session_started",
           target: "versecore_chatbot",

@@ -24,6 +24,22 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+interface BackendMessageContent {
+  content_type: string;
+  content: string;
+  order: number;
+  meta_info?: {
+    fallbackText?: string;
+  } | null;
+}
+
+interface BackendChatMessage {
+  id: string;
+  role: string;
+  timestamp: string;
+  contents: BackendMessageContent[];
+}
+
 // Keys for localStorage
 const AUTH_TOKEN_KEY = "shenleng_chat_token";
 const AUTH_USER_KEY = "shenleng_chat_user";
@@ -226,6 +242,51 @@ export async function startChatSession(chatbotId: string): Promise<string> {
   if (!res.ok) throw new Error("Failed to start chat session");
   const data = await res.json();
   return data.id;
+}
+
+function normalizeHistoryRole(role: string): ChatMessage["role"] {
+  if (role === "assistant" || role === "ai") return "ai";
+  if (role === "system") return "system";
+  return "user";
+}
+
+function extractHistoryContent(contents: BackendMessageContent[]): string {
+  return [...contents]
+    .sort((left, right) => left.order - right.order)
+    .map((item) => {
+      if (item.content_type === "text") return item.content;
+      if (item.content_type === "interaction" && item.meta_info?.fallbackText) {
+        return item.meta_info.fallbackText;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+export async function getChatHistory(
+  chatbotId: string,
+  sessionId: string,
+  limit = 50,
+): Promise<ChatMessage[]> {
+  const res = await authedFetch(
+    `${API_BASE}/chatbots/${chatbotId}/chat/${sessionId}/history?limit=${limit}`,
+  );
+  if (!res.ok) throw new Error("Failed to fetch chat history");
+
+  const history = (await res.json()) as BackendChatMessage[];
+
+  return history
+    .slice()
+    .reverse()
+    .map((message) => ({
+      id: message.id,
+      role: normalizeHistoryRole(message.role),
+      content: extractHistoryContent(message.contents || []),
+      timestamp: message.timestamp,
+    }))
+    .filter((message) => message.content);
 }
 
 export async function* sendMessageStream(
