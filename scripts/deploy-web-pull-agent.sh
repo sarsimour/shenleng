@@ -50,6 +50,32 @@ download() {
   curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 600 "$url" -o "$output"
 }
 
+download_manifest() {
+  local url="$1"
+  local output="$2"
+  local http_code
+
+  if [[ "$url" == file://* ]]; then
+    download "$url" "$output"
+    return 0
+  fi
+
+  http_code="$(curl -sSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 -o "$output" -w '%{http_code}' "$url" || true)"
+  case "$http_code" in
+    2*)
+      return 0
+      ;;
+    404)
+      rm -f "$output"
+      return 1
+      ;;
+    *)
+      rm -f "$output"
+      die "Manifest download failed. http_code=$http_code url=$url"
+      ;;
+  esac
+}
+
 manifest_url="${WEB_DEPLOY_MANIFEST_URL:-}"
 dry_run=0
 promote=0
@@ -113,7 +139,10 @@ trap 'rm -rf "$tmp_dir"; rm -rf "$LOCK_DIR"' EXIT
 
 manifest_file="$tmp_dir/manifest.json"
 log "Downloading manifest: $manifest_url"
-download "$manifest_url" "$manifest_file"
+if ! download_manifest "$manifest_url" "$manifest_file"; then
+  log "Manifest not found yet; exiting without deployment."
+  exit 0
+fi
 
 metadata_file="$tmp_dir/metadata.tsv"
 node - "$manifest_file" "$manifest_url" >"$metadata_file" <<'NODE'
