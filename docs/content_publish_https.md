@@ -12,7 +12,7 @@ This is the lightweight publishing path for articles and cover images. It does n
    https://shenleng.roinland.com/api/content-publish
    ```
 
-4. For GitHub publishing, the workflow uploads the prepared content package to R2 first, then sends only `{ packageUrl, sha256 }` to the same endpoint. This avoids large CI POST bodies being challenged by Cloudflare.
+4. For GitHub publishing, the workflow uploads the prepared content package and `shenleng/content/manifest.json` to R2. The live Next.js process polls that manifest locally and calls its own `127.0.0.1` publish endpoint. This avoids GitHub Runner POST requests being challenged by Cloudflare.
 5. The server validates the token, package URL allowlist, package sha256, payload size, image type, filename, slug, and HTML safety rules.
 6. The server writes the image to `public/media`, upserts the `media` row, upserts the `articles` row, then revalidates `/articles`, the article path, and `/sitemap.xml`.
 
@@ -106,13 +106,14 @@ content_file: data/nextjs_content/content/json/shang-hai-gang-jin-kou-leng-xiang
 site_url: https://shenleng.roinland.com
 ```
 
-The runner installs dependencies on GitHub, compresses the cover image on GitHub, uploads a JSON package to R2, then triggers the server with a small authenticated HTTPS request.
+The runner installs dependencies on GitHub, compresses the cover image on GitHub, uploads a JSON package to R2, and updates the R2 content manifest. The live server polls the manifest every 2 minutes by default.
 
 ## Safety Rules
 
 - No SSH or Cloud Assistant for routine content publishing.
 - The server never downloads external images.
 - R2 package URLs are allowlisted and verified by sha256 before use.
+- The poller runs only in the live process using `payload.db`; candidate deploy processes using `payload-candidate.db` skip it.
 - Accepted image types: JPEG, PNG, WebP.
 - Max request size: 2.5 MB.
 - Max uploaded image size after compression: 1.2 MB.

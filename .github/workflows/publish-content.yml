@@ -62,54 +62,19 @@ jobs:
           CLOUDFLARE_R2_CONTENT_PREFIX: shenleng/content
         run: python scripts/publish-r2-content-package.py --package "$RUNNER_TEMP/content-package.json"
 
-      - name: Trigger server-side content publish
+      - name: Verify R2 content manifest
         env:
-          CONTENT_PUBLISH_TOKEN: ${{ secrets.CONTENT_PUBLISH_TOKEN }}
           PACKAGE_URL: ${{ steps.package.outputs.package_url }}
           PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          SITE_URL: ${{ inputs.site_url }}
         run: |
           set -euo pipefail
 
-          : "${CONTENT_PUBLISH_TOKEN:?CONTENT_PUBLISH_TOKEN secret is required}"
           : "${PACKAGE_URL:?package_url output is required}"
           : "${PACKAGE_SHA256:?sha256 output is required}"
 
           echo "package_url=$PACKAGE_URL"
           echo "package_sha256=$PACKAGE_SHA256"
-          echo "token_length=${#CONTENT_PUBLISH_TOKEN}"
-
-          body="$(node -e 'process.stdout.write(JSON.stringify({packageUrl: process.env.PACKAGE_URL, sha256: process.env.PACKAGE_SHA256}))')"
-          response_file="$RUNNER_TEMP/content-publish-response.json"
-
-          for attempt in 1 2 3 4 5 6; do
-            http_code="$(
-              curl -sS -L \
-                -o "$response_file" \
-                -w '%{http_code}' \
-                --connect-timeout 10 \
-                --max-time 60 \
-                -X POST "$SITE_URL/api/content-publish" \
-                -H "Authorization: Bearer $CONTENT_PUBLISH_TOKEN" \
-                -H "Content-Type: application/json" \
-                --data "$body" || true
-            )"
-
-            echo "publish_attempt=$attempt http_code=$http_code"
-            head -c 1200 "$response_file" || true
-            echo
-
-            if [[ "$http_code" =~ ^2 ]]; then
-              exit 0
-            fi
-
-            if [ "$http_code" = "401" ]; then
-              echo "Authorization failed; not retrying." >&2
-              exit 1
-            fi
-
-            sleep 20
-          done
-
-          echo "Content publish did not succeed after retries." >&2
-          exit 1
+          curl -fsS --connect-timeout 10 --max-time 60 "$PACKAGE_URL" -o "$RUNNER_TEMP/published-content-package.json"
+          actual_sha="$(sha256sum "$RUNNER_TEMP/published-content-package.json" | awk '{print $1}')"
+          echo "downloaded_package_sha256=$actual_sha"
+          test "$actual_sha" = "$PACKAGE_SHA256"

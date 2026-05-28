@@ -38,6 +38,7 @@ def put_object(
     bucket: str,
     key: str,
     body: bytes,
+    cache_control: str,
 ) -> dict:
     encoded_key = urllib.parse.quote(key, safe="")
     url = (
@@ -47,7 +48,7 @@ def put_object(
     request = urllib.request.Request(url, method="PUT", data=body)
     request.add_header("Authorization", f"Bearer {token}")
     request.add_header("Content-Type", "application/json; charset=utf-8")
-    request.add_header("Cache-Control", "public, max-age=31536000, immutable")
+    request.add_header("Cache-Control", cache_control)
 
     try:
         with urllib.request.urlopen(request, timeout=120) as response:
@@ -79,6 +80,7 @@ def main() -> int:
     parser.add_argument("--prefix", default=os.environ.get("CLOUDFLARE_R2_CONTENT_PREFIX", "shenleng/content"))
     parser.add_argument("--public-base-url", default=os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", ""))
     parser.add_argument("--version", default=os.environ.get("CONTENT_PACKAGE_VERSION", ""))
+    parser.add_argument("--manifest-key", default=os.environ.get("CLOUDFLARE_R2_CONTENT_MANIFEST_KEY", ""))
     args = parser.parse_args()
 
     package_path = pathlib.Path(args.package_path)
@@ -103,7 +105,27 @@ def main() -> int:
 
     digest = sha256_file(package_path)
     package_key = f"{prefix}/packages/{version}.json"
+    version_manifest_key = f"{prefix}/manifests/{version}.json"
+    manifest_key = args.manifest_key or f"{prefix}/manifest.json"
     package_url = object_url(public_base_url, package_key)
+    created_at = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+    manifest = {
+        "schema": 1,
+        "provider": "cloudflare-r2",
+        "app": "shenleng-content",
+        "version": version,
+        "commit": github_sha,
+        "branch": os.environ.get("GITHUB_REF_NAME", ""),
+        "runId": github_run_id,
+        "createdAt": created_at,
+        "package": {
+            "key": package_key,
+            "url": package_url,
+            "sha256": digest,
+            "size": size,
+        },
+    }
+    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
 
     put_object(
         account_id=account_id,
@@ -111,6 +133,23 @@ def main() -> int:
         bucket=bucket,
         key=package_key,
         body=package_path.read_bytes(),
+        cache_control="public, max-age=31536000, immutable",
+    )
+    put_object(
+        account_id=account_id,
+        token=token,
+        bucket=bucket,
+        key=version_manifest_key,
+        body=manifest_bytes,
+        cache_control="public, max-age=31536000, immutable",
+    )
+    put_object(
+        account_id=account_id,
+        token=token,
+        bucket=bucket,
+        key=manifest_key,
+        body=manifest_bytes,
+        cache_control="no-store",
     )
 
     result = {
@@ -118,6 +157,8 @@ def main() -> int:
         "provider": "cloudflare-r2",
         "packageKey": package_key,
         "packageUrl": package_url,
+        "manifestKey": manifest_key,
+        "manifestUrl": object_url(public_base_url, manifest_key),
         "sha256": digest,
         "size": size,
     }

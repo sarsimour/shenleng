@@ -90,8 +90,9 @@ WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
 ```text
 GitHub Runner 准备文章 JSON 和封面图
   -> Runner 压缩封面图并生成内容包
-  -> 上传内容包到 R2
-  -> HTTPS POST 小体积触发请求 /api/content-publish
+  -> 上传内容包和 manifest 到 R2
+  -> 线上 Next.js 进程每 2 分钟轮询 manifest
+  -> 服务器本机调用 127.0.0.1/api/content-publish
   -> 服务器从 R2 下载内容包并校验 sha256
   -> 服务器写入 persistence/media 和 SQLite
   -> revalidate /articles、文章页、sitemap
@@ -100,12 +101,14 @@ GitHub Runner 准备文章 JSON 和封面图
 相关文件：
 
 - `src/app/api/content-publish/route.ts`
+- `src/instrumentation.ts`
+- `src/lib/server/content-publish-poller.ts`
 - `src/scripts/publish-content.ts`
 - `scripts/publish-r2-content-package.py`
 - `.github/workflows/publish-content.yml`
 - `docs/content_publish_https.md`
 
-生产环境必须设置 `CONTENT_PUBLISH_TOKEN`，GitHub workflow 使用同名 repository secret。日常内容发布不要使用 SSH、SCP、Cloud Assistant，也不要让服务器下载外部图片。GitHub workflow 使用 R2 存放临时内容包，避免大体积 POST 被 Cloudflare challenge 拦截；服务器只接受 allowlist 内的 R2 package URL，并校验 sha256。
+生产环境必须设置 `CONTENT_PUBLISH_TOKEN`，GitHub workflow 使用同名 repository secret。日常内容发布不要使用 SSH、SCP、Cloud Assistant，也不要让服务器下载外部图片。GitHub workflow 使用 R2 存放内容包和 manifest，避免 GitHub Runner 到站点的 POST 被 Cloudflare challenge 拦截；服务器只接受 allowlist 内的 R2 package URL，并校验 sha256。
 
 `src/scripts/publish-content.ts` 支持两类输入：新的发布 spec，以及仓库里已有的 `data/nextjs_content/content/json/*.json` 迁移文章。迁移文章会在 GitHub Runner 上读取 `public/images` 封面图、本地压缩后再通过 HTTPS 写入线上。
 
