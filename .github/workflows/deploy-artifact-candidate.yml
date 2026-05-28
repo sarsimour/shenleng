@@ -106,16 +106,18 @@ jobs:
 
           echo "=== Native SCP upload ==="
           ls -lh "$ARTIFACT_NAME"
-          /usr/bin/time -v timeout 8m scp -O "${ssh_opts[@]}" "$ARTIFACT_NAME" "$ECS_USER@$ECS_HOST:$remote_dir/"
+          /usr/bin/time -v timeout 8m scp -O "${ssh_opts[@]}" \
+            "$ARTIFACT_NAME" \
+            scripts/deploy-web-light.sh \
+            "$ECS_USER@$ECS_HOST:$remote_dir/"
 
           echo "=== Remote upload verification ==="
-          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" "ls -lh '$remote_dir/$ARTIFACT_NAME' && du -sh '$remote_dir'"
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" "mkdir -p '/home/$ECS_USER/Projects/shenleng/scripts' && cp '$remote_dir/deploy-web-light.sh' '/home/$ECS_USER/Projects/shenleng/scripts/deploy-web-light.sh' && chmod +x '/home/$ECS_USER/Projects/shenleng/scripts/deploy-web-light.sh' && ls -lh '$remote_dir/$ARTIFACT_NAME' && du -sh '$remote_dir'"
 
-      - name: Start candidate, measure resources, validate, stop
+      - name: Validate candidate with light deploy script
         uses: appleboy/ssh-action@v1.0.3
         env:
           RUN_ID: ${{ github.run_id }}
-          GITHUB_SHA: ${{ github.sha }}
           ARTIFACT_NAME: ${{ env.ARTIFACT_NAME }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
@@ -130,12 +132,11 @@ jobs:
           key: ${{ secrets.ECS_SSH_KEY }}
           timeout: 10m
           command_timeout: 15m
-          envs: RUN_ID,GITHUB_SHA,ARTIFACT_NAME,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID,NEXT_PUBLIC_SITE_URL,REQUEST_LOG_SHARED_SECRET
+          envs: RUN_ID,ARTIFACT_NAME,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID,NEXT_PUBLIC_SITE_URL,REQUEST_LOG_SHARED_SECRET
           script: |
-            set -eu
+            set -euo pipefail
 
             : "${RUN_ID:?RUN_ID is required}"
-            : "${GITHUB_SHA:?GITHUB_SHA is required}"
             : "${ARTIFACT_NAME:?ARTIFACT_NAME is required}"
             : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
             : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
@@ -143,12 +144,9 @@ jobs:
 
             PROJECT_DIR="/home/${USER}/Projects/shenleng"
             UPLOAD_DIR="$PROJECT_DIR/artifact-uploads/$RUN_ID"
-            RELEASE_DIR="$PROJECT_DIR/artifact-candidates/${RUN_ID}-${GITHUB_SHA}"
-            LOG_DIR="$PROJECT_DIR/artifact-candidate-logs"
-            PORT="3001"
 
             if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
-              VERSECORE_API_BASE_URL="http://versecore-api:9000"
+              VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
             fi
             if [ -z "${NEXT_PUBLIC_VERSECORE_APP_ID:-}" ]; then
               NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"
@@ -157,138 +155,18 @@ jobs:
               NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="申冷售前顾问"
             fi
 
-            echo "=== Server baseline ==="
-            date -Is
-            uname -a
-            echo "--- memory before ---"
-            free -h
-            echo "--- disk before ---"
-            df -h /
-            echo "--- project sizes before ---"
-            du -sh "$PROJECT_DIR"/persistence "$PROJECT_DIR"/artifact-candidates "$PROJECT_DIR"/artifact-uploads 2>/dev/null || true
-            echo "--- current live containers/processes ---"
-            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || true
-
-            echo "=== Prepare release directory ==="
             test -s "$UPLOAD_DIR/$ARTIFACT_NAME"
-            mkdir -p "$RELEASE_DIR" "$LOG_DIR"
-            tar -xzf "$UPLOAD_DIR/$ARTIFACT_NAME" -C "$RELEASE_DIR"
-            mkdir -p "$RELEASE_DIR/database" "$RELEASE_DIR/public"
-
-            if [ ! -d "$PROJECT_DIR/persistence/images" ]; then
-              echo "Creating persistent public/images copy from live container..."
-              rm -rf "$PROJECT_DIR/persistence/images.tmp"
-              if docker cp shenleng-container:/app/public/images "$PROJECT_DIR/persistence/images.tmp" 2>/dev/null; then
-                mv "$PROJECT_DIR/persistence/images.tmp" "$PROJECT_DIR/persistence/images"
-              else
-                echo "WARN: live container images copy failed; creating empty persistence/images." >&2
-                mkdir -p "$PROJECT_DIR/persistence/images"
-              fi
-            fi
-
-            rm -rf "$RELEASE_DIR/public/media"
-            rm -rf "$RELEASE_DIR/public/images"
-            ln -s "$PROJECT_DIR/persistence/media" "$RELEASE_DIR/public/media"
-            ln -s "$PROJECT_DIR/persistence/images" "$RELEASE_DIR/public/images"
-
-            if [ -f "$PROJECT_DIR/persistence/sqlite/payload.db" ]; then
-              cp "$PROJECT_DIR/persistence/sqlite/payload.db" "$RELEASE_DIR/database/payload-candidate.db"
-            else
-              echo "ERROR: production payload.db not found at $PROJECT_DIR/persistence/sqlite/payload.db" >&2
-              exit 1
-            fi
-
-            echo "--- artifact sizes on server ---"
-            ls -lh "$UPLOAD_DIR/$ARTIFACT_NAME"
-            du -sh "$RELEASE_DIR" "$RELEASE_DIR"/database "$RELEASE_DIR"/public 2>/dev/null || true
-
-            old_pids="$(lsof -ti tcp:$PORT 2>/dev/null || true)"
-            if [ -n "$old_pids" ]; then
-              echo "Stopping stale process(es) on port $PORT: $old_pids"
-              kill $old_pids || true
-              sleep 2
-            fi
-
-            echo "=== Start candidate on port $PORT ==="
-            cd "$RELEASE_DIR"
-            start_epoch=$(date +%s)
-            nohup env \
-              NODE_ENV=production \
-              NEXT_TELEMETRY_DISABLED=1 \
-              PORT="$PORT" \
-              HOSTNAME=127.0.0.1 \
+            cd "$PROJECT_DIR"
+            PROJECT_DIR="$PROJECT_DIR" \
+              PUBLIC_URL="$NEXT_PUBLIC_SITE_URL" \
+              WEB_DEPLOY_VERSECORE_API_BASE_URL="$VERSECORE_API_BASE_URL" \
               PAYLOAD_SECRET="$PAYLOAD_SECRET" \
-              DATABASE_URI="file:$RELEASE_DIR/database/payload-candidate.db" \
-              PAYLOAD_CONFIG_PATH=src/payload.config.ts \
-              VERSECORE_API_BASE_URL="$VERSECORE_API_BASE_URL" \
               NEXT_PUBLIC_VERSECORE_APP_ID="$NEXT_PUBLIC_VERSECORE_APP_ID" \
               NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME" \
               NEXT_PUBLIC_LOGISTICS_CHATBOT_ID="$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID" \
               NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL" \
               REQUEST_LOG_SHARED_SECRET="${REQUEST_LOG_SHARED_SECRET:-}" \
-              node server.js > "$LOG_DIR/$RUN_ID.log" 2>&1 &
-            pid="$!"
-            echo "candidate_pid=$pid"
-
-            cleanup() {
-              if kill -0 "$pid" 2>/dev/null; then
-                echo "Stopping candidate pid $pid"
-                kill "$pid" || true
-                sleep 2
-              fi
-            }
-            trap cleanup EXIT
-
-            ready=0
-            for i in $(seq 1 45); do
-              if curl -fsS "http://127.0.0.1:$PORT/" >/tmp/shenleng-candidate-home.html; then
-                ready=1
-                break
-              fi
-              if ! kill -0 "$pid" 2>/dev/null; then
-                echo "ERROR: candidate process exited early" >&2
-                tail -n 160 "$LOG_DIR/$RUN_ID.log" || true
-                exit 1
-              fi
-              sleep 2
-            done
-
-            if [ "$ready" != "1" ]; then
-              echo "ERROR: candidate did not become ready" >&2
-              tail -n 160 "$LOG_DIR/$RUN_ID.log" || true
-              exit 1
-            fi
-            ready_epoch=$(date +%s)
-            echo "startup_seconds=$((ready_epoch - start_epoch))"
-
-            echo "=== Candidate validation ==="
-            home_code="$(curl -sS -o /tmp/shenleng-candidate-home.html -w '%{http_code}' "http://127.0.0.1:$PORT/")"
-            echo "home_status=$home_code"
-            test "$home_code" = "200"
-
-            legacy_headers="$(mktemp)"
-            legacy_code="$(curl -sS -o /dev/null -D "$legacy_headers" -w '%{http_code}' "http://127.0.0.1:$PORT/show.asp?id=1233")"
-            legacy_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' "$legacy_headers" | tr -d '\r' | tail -n 1)"
-            echo "legacy_status=$legacy_code"
-            echo "legacy_location=$legacy_location"
-            case "$legacy_code" in
-              301|302|307|308) ;;
-              *) echo "ERROR: legacy URL did not redirect" >&2; cat "$legacy_headers"; exit 1 ;;
-            esac
-            echo "$legacy_location" | grep -q '^/articles/'
-
-            sitemap_code="$(curl -sS -o /tmp/shenleng-candidate-sitemap.xml -w '%{http_code}' "http://127.0.0.1:$PORT/sitemap.xml")"
-            echo "sitemap_status=$sitemap_code"
-            test "$sitemap_code" = "200"
-
-            echo "=== Runtime resources ==="
-            ps -o pid,ppid,rss,vsz,pcpu,pmem,etime,comm -p "$pid"
-            echo "--- memory after validation ---"
-            free -h
-            echo "--- disk after release ---"
-            df -h /
-            du -sh "$RELEASE_DIR" "$UPLOAD_DIR" "$PROJECT_DIR"/artifact-candidates "$PROJECT_DIR"/artifact-uploads 2>/dev/null || true
-            echo "--- candidate log tail ---"
-            tail -n 120 "$LOG_DIR/$RUN_ID.log" || true
-
-            echo "=== Candidate artifact trial complete ==="
+              scripts/deploy-web-light.sh \
+                --artifact "$UPLOAD_DIR/$ARTIFACT_NAME" \
+                --candidate-only \
+                --skip-public-precheck

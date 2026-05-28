@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Shenleng lightweight web watchdog every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=15s
+Unit=shenleng-web-watchdog.service
+
+[Install]
+WantedBy=timers.target

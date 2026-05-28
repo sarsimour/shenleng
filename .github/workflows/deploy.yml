@@ -1,146 +1,227 @@
-name: Deploy Shenleng (GH Build → ACR → ECS Pull)
+name: Deploy Shenleng Web (Light Artifact)
 
 on:
   push:
     branches: ["master"]
   workflow_dispatch:
+    inputs:
+      candidate_only:
+        description: "Validate the uploaded artifact on the candidate port without switching live traffic"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: shenleng-web-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
-  ACR_REGISTRY: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com
-  IMAGE_NAME: crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw:latest
+  ARTIFACT_NAME: shenleng-web-standalone.tgz
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-light:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Enforce light deploy policy
+        run: bash scripts/check-light-deploy-policy.sh
 
-      # ECS 仅 1.6GB RAM 无法 build；ACR 个人版的 GitHub 源构建也不可靠。
-      # 这里改在 GH Runner 上 build（7GB RAM 充足）并推到 ACR，ECS 同 region 拉镜像。
-      - name: Log in to Alibaba Cloud ACR
-        uses: docker/login-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          registry: ${{ env.ACR_REGISTRY }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          node-version: "20"
+          cache: npm
 
-      - name: Build and push image to ACR
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ env.IMAGE_NAME }}
-          # 个人版 ACR 不支持 manifest list，限定单架构
-          platforms: linux/amd64
-          build-args: |
-            NEXT_PUBLIC_VERSECORE_APP_ID=${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID || 'logistics-web' }}
-            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME || '申冷售前顾问' }}
-            NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
-            NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
-          # 用 GH Actions 的 cache，缩短后续 build 时间
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Install dependencies on GitHub runner
+        run: npm ci --legacy-peer-deps
 
-      # 同步运行时配置到 ECS
-      - name: Copy configs to ECS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 5m
-          source: "docker-compose.yml,nginx.conf"
-          target: "/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-
-      - name: Pull image and restart container on ECS
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Build standalone artifact on GitHub runner
         env:
-          ACR_REGISTRY: ${{ env.ACR_REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          NEXT_TELEMETRY_DISABLED: "1"
+          PAYLOAD_SECRET: build_secret_placeholder
+          DATABASE_URI: file:./payload-build.db
+          PAYLOAD_CONFIG_PATH: src/payload.config.ts
+          NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID || 'logistics-web' }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME || '申冷售前顾问' }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+
+          : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
+          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
+
+          echo "=== Build environment ==="
+          node -v
+          npm -v
+          df -h /
+          free -h
+
+          npm run generate:importmap
+          /usr/bin/time -v npm run build
+
+          rm -rf artifact-root
+          mkdir -p artifact-root/.next
+          rsync -a .next/standalone/ artifact-root/
+          rsync -a .next/static/ artifact-root/.next/static/
+          rsync -a --exclude media --exclude images public/ artifact-root/public/
+          mkdir -p artifact-root/src/app
+          rsync -a src/payload.config.ts src/payload-types.ts artifact-root/src/
+          rsync -a src/collections artifact-root/src/
+          rsync -a src/lib artifact-root/src/
+          rsync -a src/scripts artifact-root/src/
+          rsync -a src/app/sitemap.ts artifact-root/src/app/
+          if [ -d redirects ]; then
+            rsync -a redirects/ artifact-root/redirects/
+          fi
+
+          tar -C artifact-root -czf "$ARTIFACT_NAME" .
+          ls -lh "$ARTIFACT_NAME"
+          echo "artifact_size=$(du -h "$ARTIFACT_NAME" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure SSH
+        env:
+          ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          : "${ECS_SSH_KEY:?ECS_SSH_KEY is required}"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ECS_SSH_KEY" > ~/.ssh/shenleng-ecs
+          chmod 600 ~/.ssh/shenleng-ecs
+
+      - name: Upload artifact and light deploy script
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+        run: |
+          set -euo pipefail
+
+          : "${ECS_HOST:?ECS_HOST is required}"
+          : "${ECS_USER:?ECS_USER is required}"
+
+          sha_short="${GITHUB_SHA:0:12}"
+          project_dir="/home/$ECS_USER/Projects/shenleng"
+          remote_dir="$project_dir/artifact-uploads/${GITHUB_RUN_ID}-${sha_short}"
+
+          ssh_opts=(
+            -i ~/.ssh/shenleng-ecs
+            -o BatchMode=yes
+            -o ConnectTimeout=30
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+          )
+
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
+            "mkdir -p '$remote_dir' '$project_dir/scripts' '$project_dir/artifact-uploads'"
+
+          /usr/bin/time -v timeout 8m scp -O "${ssh_opts[@]}" \
+            "$ARTIFACT_NAME" \
+            scripts/deploy-web-light.sh \
+            "$ECS_USER@$ECS_HOST:$remote_dir/"
+
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
+            "cp '$remote_dir/deploy-web-light.sh' '$project_dir/scripts/deploy-web-light.sh' && chmod +x '$project_dir/scripts/deploy-web-light.sh' && ls -lh '$remote_dir/$ARTIFACT_NAME'"
+
+      - name: Write runtime environment on ECS
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
           NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID }}
           NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME }}
           NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-        with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          timeout: 10m
-          command_timeout: 15m
-          envs: ACR_REGISTRY,IMAGE_NAME,ACR_USERNAME,ACR_PASSWORD,PAYLOAD_SECRET,VERSECORE_API_BASE_URL,NEXT_PUBLIC_VERSECORE_APP_ID,NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME,NEXT_PUBLIC_LOGISTICS_CHATBOT_ID,NEXT_PUBLIC_SITE_URL
-          script: |
-            set -e
+          REQUEST_LOG_SHARED_SECRET: ${{ secrets.REQUEST_LOG_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
 
-            : "${ACR_REGISTRY:?ACR_REGISTRY is required}"
-            : "${IMAGE_NAME:?IMAGE_NAME is required}"
-            : "${ACR_USERNAME:?ACR_USERNAME is required}"
-            : "${ACR_PASSWORD:?ACR_PASSWORD is required}"
-            : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
-            : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
-            : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
+          : "${ECS_HOST:?ECS_HOST is required}"
+          : "${ECS_USER:?ECS_USER is required}"
+          : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
+          : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
+          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
 
-            PROJECT_DIR="/home/${{ secrets.ECS_USER }}/Projects/shenleng"
-            cd "$PROJECT_DIR"
+          if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
+            VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
+          fi
+          if [ -z "${NEXT_PUBLIC_VERSECORE_APP_ID:-}" ]; then
+            NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"
+          fi
+          if [ -z "${NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME:-}" ]; then
+            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="申冷售前顾问"
+          fi
 
-            echo "📁 Ensuring persistence directories..."
-            mkdir -p persistence/sqlite persistence/media
-            chmod -R 777 persistence/
+          umask 077
+          {
+            printf 'PAYLOAD_SECRET=%s\n' "$PAYLOAD_SECRET"
+            printf 'VERSECORE_API_BASE_URL=%s\n' "$VERSECORE_API_BASE_URL"
+            printf 'NEXT_PUBLIC_VERSECORE_APP_ID=%s\n' "$NEXT_PUBLIC_VERSECORE_APP_ID"
+            printf 'NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=%s\n' "$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME"
+            printf 'NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=%s\n' "$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID"
+            printf 'NEXT_PUBLIC_SITE_URL=%s\n' "$NEXT_PUBLIC_SITE_URL"
+            printf 'REQUEST_LOG_SHARED_SECRET=%s\n' "$REQUEST_LOG_SHARED_SECRET"
+          } > runtime.env
 
-            echo "🧹 Reclaiming Docker disk space before pull..."
-            docker container prune -f || true
-            docker image prune -f || true
-            df -h /
+          ssh_opts=(
+            -i ~/.ssh/shenleng-ecs
+            -o BatchMode=yes
+            -o ConnectTimeout=30
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+          )
 
-            echo "🔐 Logging into Alibaba Cloud ACR..."
-            printf '%s' "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
+          project_dir="/home/$ECS_USER/Projects/shenleng"
+          scp -O "${ssh_opts[@]}" runtime.env "$ECS_USER@$ECS_HOST:$project_dir/.env.tmp"
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
+            "chmod 600 '$project_dir/.env.tmp' && mv '$project_dir/.env.tmp' '$project_dir/.env'"
 
-            echo "📥 Pulling latest image..."
-            docker pull "$IMAGE_NAME"
+      - name: Run light deploy on ECS
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
+        run: |
+          set -euo pipefail
 
-            echo "🧾 Writing runtime environment..."
-            if [ -z "$VERSECORE_API_BASE_URL" ]; then
-              VERSECORE_API_BASE_URL="http://versecore-api:9000"
-            fi
-            if [ -z "$NEXT_PUBLIC_VERSECORE_APP_ID" ]; then
-              NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"
-            fi
-            if [ -z "$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME" ]; then
-              NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="申冷售前顾问"
-            fi
+          : "${ECS_HOST:?ECS_HOST is required}"
+          : "${ECS_USER:?ECS_USER is required}"
+          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
 
-            umask 077
-            cat > .env.tmp <<EOF
-            PAYLOAD_SECRET=$PAYLOAD_SECRET
-            VERSECORE_API_BASE_URL=$VERSECORE_API_BASE_URL
-            NEXT_PUBLIC_VERSECORE_APP_ID=$NEXT_PUBLIC_VERSECORE_APP_ID
-            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME
-            NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID
-            NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
-            EOF
-            mv .env.tmp .env
+          if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
+            VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
+          fi
 
-            echo "🚀 Recreating container with new image..."
-            docker compose up -d --remove-orphans --force-recreate
+          deploy_mode="--yes"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.candidate_only }}" = "true" ]; then
+            deploy_mode="--candidate-only"
+          fi
 
-            echo "🧱 Syncing database schema..."
-            docker compose exec -T web sh -c "cd /app && npm run schema:sync"
+          sha_short="${GITHUB_SHA:0:12}"
+          project_dir="/home/$ECS_USER/Projects/shenleng"
+          artifact_path="$project_dir/artifact-uploads/${GITHUB_RUN_ID}-${sha_short}/$ARTIFACT_NAME"
 
-            echo "🧪 Running post-deploy smoke test..."
-            docker compose exec -T -e SMOKE_BASE_URL="http://127.0.0.1:3000" web sh -c "cd /app && npm run smoke:post-deploy"
+          ssh_opts=(
+            -i ~/.ssh/shenleng-ecs
+            -o BatchMode=yes
+            -o ConnectTimeout=30
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+          )
 
-            echo "🔄 Reloading Nginx..."
-            sudo nginx -s reload || true
-
-            echo "🧹 Final dangling image cleanup..."
-            docker image prune -f || true
-            df -h /
-
-            echo "✅ Deployment complete!"
+          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
+            "cd '$project_dir' && PROJECT_DIR='$project_dir' PUBLIC_URL='$NEXT_PUBLIC_SITE_URL' WEB_DEPLOY_VERSECORE_API_BASE_URL='$VERSECORE_API_BASE_URL' scripts/deploy-web-light.sh --artifact '$artifact_path' $deploy_mode"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Shenleng frontend Next.js standalone
+After=network-online.target docker.service cloudflared.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{RUN_USER}}
+Group={{RUN_USER}}
+WorkingDirectory={{PROJECT_DIR}}/current-web
+EnvironmentFile={{PROJECT_DIR}}/.env
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PORT=3000
+Environment=HOSTNAME=0.0.0.0
+Environment=DATABASE_URI=file:{{PROJECT_DIR}}/persistence/sqlite/payload.db
+Environment=PAYLOAD_CONFIG_PATH=src/payload.config.ts
+Environment=VERSECORE_API_BASE_URL=http://127.0.0.1:9000
+ExecStart={{NODE_BIN}} server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+LimitNOFILE=8192
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Shenleng lightweight web watchdog
+After=network-online.target shenleng-web.service cloudflared.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PUBLIC_URL={{PUBLIC_URL}}
+ExecStart={{PROJECT_DIR}}/scripts/shenleng-web-watchdog.sh
