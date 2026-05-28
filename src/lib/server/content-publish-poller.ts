@@ -33,7 +33,7 @@ function isLiveDatabase() {
   return databaseUri.includes("payload.db") && !databaseUri.includes("payload-candidate.db");
 }
 
-function stateFilePath() {
+export function contentPublishStateFilePath() {
   const databaseUri = process.env.DATABASE_URI || "";
   const databasePath = databaseUri.replace(/^file:/, "");
   const persistenceMarker = `${path.sep}persistence${path.sep}`;
@@ -49,14 +49,18 @@ function stateFilePath() {
 
 async function readAppliedVersion() {
   try {
-    return (await fs.readFile(stateFilePath(), "utf8")).trim();
+    return (await fs.readFile(contentPublishStateFilePath(), "utf8")).trim();
   } catch {
     return "";
   }
 }
 
+export async function readAppliedContentVersion() {
+  return readAppliedVersion();
+}
+
 async function writeAppliedVersion(version: string) {
-  const stateFile = stateFilePath();
+  const stateFile = contentPublishStateFilePath();
   await fs.mkdir(path.dirname(stateFile), { recursive: true });
   await fs.writeFile(stateFile, `${version}\n`, "utf8");
 }

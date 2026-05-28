@@ -127,9 +127,10 @@ The runner installs dependencies on GitHub, compresses the cover image on GitHub
 After publishing:
 
 ```bash
+curl -s https://shenleng.roinland.com/api/content-publish
 curl -I https://shenleng.roinland.com/articles/<slug>
 curl -I https://shenleng.roinland.com/api/media/file/<filename>
 curl -s https://shenleng.roinland.com/sitemap.xml | rg '<slug>'
 ```
 
-Expected result: all HTTP checks return `200`, and sitemap contains the article URL.
+Expected result: status JSON includes the latest `appliedVersion`, all HTTP checks return `200`, and sitemap contains the article URL.

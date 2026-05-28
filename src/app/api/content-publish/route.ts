@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@libsql/client";
 import sharp from "sharp";
+import { readAppliedContentVersion } from "@/lib/server/content-publish-poller";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -613,4 +614,11 @@ export async function POST(req: NextRequest) {
     console.error("[content-publish] failed:", message);
     return json({ ok: false, error: message }, message === "request_too_large" ? 413 : 400);
   }
+}
+
+export async function GET() {
+  return json({
+    ok: true,
+    appliedVersion: await readAppliedContentVersion(),
+  });
 }
