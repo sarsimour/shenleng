@@ -181,6 +181,37 @@ function safeJpegFilename(spec: ContentSpec) {
   return `${base}.jpg`;
 }
 
+function logStatus(message: string, details?: Record<string, unknown>) {
+  if (details) {
+    console.log(`[content-publish] ${message} ${JSON.stringify(details)}`);
+    return;
+  }
+
+  console.log(`[content-publish] ${message}`);
+}
+
+function describeError(error: unknown) {
+  if (error instanceof Error) {
+    const cause =
+      error.cause instanceof Error
+        ? { causeName: error.cause.name, causeMessage: error.cause.message }
+        : error.cause
+          ? { cause: String(error.cause) }
+          : {};
+
+    return {
+      name: error.name,
+      message: error.message || "(empty error message)",
+      ...cause,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    message: typeof error === "string" ? error : JSON.stringify(error),
+  };
+}
+
 async function readLegacyHtml(spec: ContentSpec, specDir: string) {
   if (spec.legacyHtml) return spec.legacyHtml;
   if (!spec.legacyHtmlPath) {
@@ -249,6 +280,14 @@ async function main() {
   const legacyHtml = await readLegacyHtml(spec, specDir);
   const coverImage = await prepareCoverImage(spec, specDir);
   const endpoint = `${options.siteUrl}/api/content-publish`;
+  logStatus("prepared payload", {
+    slug: spec.slug,
+    dryRun: options.dryRun,
+    legacyHtmlBytes: Buffer.byteLength(legacyHtml, "utf8"),
+    coverFilename: coverImage.filename,
+    coverBytes: coverImage.bytes,
+    tokenLength: token?.length || 0,
+  });
 
   const payload = {
     title: spec.title,
@@ -282,6 +321,8 @@ async function main() {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
+  const payloadBytes = Buffer.byteLength(JSON.stringify(payload), "utf8");
+  logStatus("posting", { endpoint, payloadBytes });
 
   try {
     const response = await fetch(endpoint, {
@@ -302,6 +343,8 @@ async function main() {
       body = text;
     }
 
+    logStatus("response received", { status: response.status, ok: response.ok });
+
     if (!response.ok) {
       throw new Error(`publish failed: HTTP ${response.status} ${JSON.stringify(body)}`);
     }
@@ -313,6 +356,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
+  console.error("[content-publish] error", JSON.stringify(describeError(error), null, 2));
   process.exit(1);
 });

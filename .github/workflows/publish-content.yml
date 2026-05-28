@@ -48,4 +48,15 @@ jobs:
           : "${CONTENT_PUBLISH_TOKEN:?CONTENT_PUBLISH_TOKEN secret is required}"
           test -f "$CONTENT_FILE"
 
+          echo "content_file=$CONTENT_FILE"
+          echo "site_url=$SITE_URL"
+          echo "token_length=${#CONTENT_PUBLISH_TOKEN}"
+
+          npm run content:publish -- --dry-run --site "$SITE_URL" "$CONTENT_FILE"
+
+          set +e
           npm run content:publish -- --site "$SITE_URL" "$CONTENT_FILE"
+          status=$?
+          set -e
+          echo "publisher_exit_status=$status"
+          exit "$status"
