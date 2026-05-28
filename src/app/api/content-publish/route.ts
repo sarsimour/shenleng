@@ -15,6 +15,7 @@ const MAX_HTML_BYTES = 200_000;
 const MAX_SUMMARY_BYTES = 1_000;
 const MAX_TITLE_BYTES = 180;
 const MAX_SLUG_BYTES = 140;
+const DEFAULT_PACKAGE_BASE_URL = "https://pub-651f3cd4b3cd4772b94feb2194349b8b.r2.dev/shenleng/content/";
 
 const SAFE_SLUG_RE = /^[a-z0-9][a-z0-9-]{2,139}$/;
 const SAFE_FILENAME_RE = /^[a-z0-9][a-z0-9._-]{2,179}\.(jpe?g|png|webp)$/;
@@ -34,6 +35,11 @@ type ContentPublishInput = {
   baseViews?: unknown;
   publishedAt?: unknown;
   coverImage?: CoverImageInput;
+};
+
+type PackagePublishInput = {
+  packageUrl?: unknown;
+  sha256?: unknown;
 };
 
 type ValidatedInput = {
@@ -70,6 +76,10 @@ function json(body: Record<string, unknown>, status = 200) {
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest();
+}
+
+function sha256Hex(value: Buffer) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function constantTimeTokenMatch(provided: string, expected: string) {
@@ -166,6 +176,96 @@ function validatePublishedAt(value: unknown) {
     throw new Error("invalid_published_at");
   }
   return date.toISOString();
+}
+
+function packageBaseUrls() {
+  const configured = process.env.CONTENT_PUBLISH_PACKAGE_BASE_URLS || process.env.CONTENT_PUBLISH_PACKAGE_BASE_URL;
+  const values = configured
+    ? configured
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+
+  return [...values, DEFAULT_PACKAGE_BASE_URL].map((value) => {
+    const url = new URL(value);
+    if (url.protocol !== "https:") {
+      throw new Error("invalid_package_base_url");
+    }
+    if (!url.pathname.endsWith("/")) {
+      url.pathname = `${url.pathname}/`;
+    }
+    return url.toString();
+  });
+}
+
+function validatePackagePointer(input: PackagePublishInput) {
+  if (typeof input.packageUrl !== "string" || typeof input.sha256 !== "string") {
+    throw new Error("invalid_package_pointer");
+  }
+
+  const packageUrl = new URL(input.packageUrl);
+  if (packageUrl.protocol !== "https:" || packageUrl.username || packageUrl.password) {
+    throw new Error("invalid_package_url");
+  }
+
+  const href = packageUrl.toString();
+  const isAllowed = packageBaseUrls().some((baseUrl) => href.startsWith(baseUrl));
+  if (!isAllowed) {
+    throw new Error("package_url_not_allowed");
+  }
+
+  const expectedSha = input.sha256.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(expectedSha)) {
+    throw new Error("invalid_package_sha256");
+  }
+
+  return { packageUrl: href, expectedSha };
+}
+
+async function readResponseWithLimit(response: Response) {
+  const contentLength = Number(response.headers.get("content-length") || "0");
+  if (contentLength > MAX_REQUEST_BYTES) {
+    throw new Error("package_too_large");
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > MAX_REQUEST_BYTES) {
+    throw new Error("package_too_large");
+  }
+
+  return buffer;
+}
+
+async function loadPackageInput(pointer: PackagePublishInput): Promise<ContentPublishInput> {
+  const { packageUrl, expectedSha } = validatePackagePointer(pointer);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+
+  try {
+    const response = await fetch(packageUrl, {
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`package_download_failed_${response.status}`);
+    }
+
+    const buffer = await readResponseWithLimit(response);
+    const actualSha = sha256Hex(buffer);
+    if (actualSha !== expectedSha) {
+      throw new Error("package_sha256_mismatch");
+    }
+
+    try {
+      return JSON.parse(buffer.toString("utf8")) as ContentPublishInput;
+    } catch {
+      throw new Error("invalid_package_json");
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function decodeBase64Image(value: unknown) {
@@ -471,13 +571,21 @@ async function parseRequest(req: NextRequest) {
   }
 }
 
+async function resolvePublishInput(input: ContentPublishInput & PackagePublishInput) {
+  if (input.packageUrl != null || input.sha256 != null) {
+    return loadPackageInput(input);
+  }
+
+  return input;
+}
+
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return json({ ok: false }, 401);
   }
 
   try {
-    const body = await parseRequest(req);
+    const body = await resolvePublishInput(await parseRequest(req));
     const input = await validateInput(body);
     await writeMediaFile(input);
     const result = await upsertDatabase(input);

@@ -6,14 +6,15 @@ This is the lightweight publishing path for articles and cover images. It does n
 
 1. Prepare article JSON and local cover image on a workstation or GitHub runner.
 2. `src/scripts/publish-content.ts` compresses the cover image locally.
-3. The script sends one authenticated `POST` request to:
+3. For local publishing, the script sends one authenticated `POST` request to:
 
    ```text
    https://shenleng.roinland.com/api/content-publish
    ```
 
-4. The server validates the token, payload size, image type, filename, slug, and HTML safety rules.
-5. The server writes the image to `public/media`, upserts the `media` row, upserts the `articles` row, then revalidates `/articles`, the article path, and `/sitemap.xml`.
+4. For GitHub publishing, the workflow uploads the prepared content package to R2 first, then sends only `{ packageUrl, sha256 }` to the same endpoint. This avoids large CI POST bodies being challenged by Cloudflare.
+5. The server validates the token, package URL allowlist, package sha256, payload size, image type, filename, slug, and HTML safety rules.
+6. The server writes the image to `public/media`, upserts the `media` row, upserts the `articles` row, then revalidates `/articles`, the article path, and `/sitemap.xml`.
 
 ## Required Secret
 
@@ -26,6 +27,17 @@ CONTENT_PUBLISH_TOKEN=<random 32+ character token>
 The same value is needed as the GitHub repository secret `CONTENT_PUBLISH_TOKEN` if the GitHub workflow is used.
 
 If this token is missing or shorter than 32 characters, the endpoint returns `401` and publishes nothing.
+
+GitHub publishing also uses the existing R2 secrets:
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_R2_BUCKET_NAME
+CLOUDFLARE_R2_PUBLIC_BASE_URL
+```
+
+The server accepts package URLs under `https://pub-651f3cd4b3cd4772b94feb2194349b8b.r2.dev/shenleng/content/` by default. Override with `CONTENT_PUBLISH_PACKAGE_BASE_URLS` only when moving to a different R2 public base.
 
 ## Content Spec
 
@@ -71,6 +83,13 @@ Dry run, no network request:
 npm run content:publish -- --dry-run path/to/content.json
 ```
 
+Create a content package for R2-based publishing:
+
+```bash
+npm run content:publish -- --package-output /tmp/content-package.json path/to/content.json
+python scripts/publish-r2-content-package.py --package /tmp/content-package.json
+```
+
 ## GitHub Workflow
 
 Use `.github/workflows/publish-content.yml` with manual dispatch:
@@ -87,12 +106,13 @@ content_file: data/nextjs_content/content/json/shang-hai-gang-jin-kou-leng-xiang
 site_url: https://shenleng.roinland.com
 ```
 
-The runner installs dependencies on GitHub, compresses the cover image on GitHub, and publishes over HTTPS.
+The runner installs dependencies on GitHub, compresses the cover image on GitHub, uploads a JSON package to R2, then triggers the server with a small authenticated HTTPS request.
 
 ## Safety Rules
 
 - No SSH or Cloud Assistant for routine content publishing.
 - The server never downloads external images.
+- R2 package URLs are allowlisted and verified by sha256 before use.
 - Accepted image types: JPEG, PNG, WebP.
 - Max request size: 2.5 MB.
 - Max uploaded image size after compression: 1.2 MB.

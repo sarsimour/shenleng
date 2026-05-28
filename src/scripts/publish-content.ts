@@ -35,12 +35,14 @@ type CliOptions = {
   specPath: string;
   siteUrl: string;
   dryRun: boolean;
+  packageOutput: string;
 };
 
 function usage(): never {
   console.error(
     [
       "Usage: pnpm content:publish [--site https://shenleng.roinland.com] [--dry-run] <content.json>",
+      "       pnpm content:publish --package-output /tmp/content-package.json <content.json>",
       "",
       "The content file can be a publish spec or a migrated data/nextjs_content JSON file.",
       "",
@@ -54,6 +56,7 @@ function usage(): never {
 function parseArgs(argv: string[]): CliOptions {
   let siteUrl = process.env.CONTENT_PUBLISH_URL || process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
   let dryRun = false;
+  let packageOutput = "";
   let specPath = "";
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -72,6 +75,14 @@ function parseArgs(argv: string[]): CliOptions {
       continue;
     }
 
+    if (arg === "--package-output") {
+      const value = argv[index + 1];
+      if (!value) usage();
+      packageOutput = value;
+      index += 1;
+      continue;
+    }
+
     if (arg.startsWith("-")) usage();
     specPath = arg;
   }
@@ -82,6 +93,7 @@ function parseArgs(argv: string[]): CliOptions {
     specPath: path.resolve(process.cwd(), specPath),
     siteUrl: siteUrl.replace(/\/+$/, ""),
     dryRun,
+    packageOutput: packageOutput ? path.resolve(process.cwd(), packageOutput) : "",
   };
 }
 
@@ -271,7 +283,7 @@ async function prepareCoverImage(spec: ContentSpec, specDir: string) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const token = process.env.CONTENT_PUBLISH_TOKEN?.trim();
-  if (!token && !options.dryRun) {
+  if (!token && !options.dryRun && !options.packageOutput) {
     throw new Error("CONTENT_PUBLISH_TOKEN is required");
   }
 
@@ -298,6 +310,29 @@ async function main() {
     publishedAt: spec.publishedAt,
     coverImage,
   };
+
+  if (options.packageOutput) {
+    await fs.mkdir(path.dirname(options.packageOutput), { recursive: true });
+    const packageBody = JSON.stringify(payload);
+    await fs.writeFile(options.packageOutput, packageBody);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          packageOutput: options.packageOutput,
+          slug: spec.slug,
+          bytes: Buffer.byteLength(packageBody, "utf8"),
+          coverImage: {
+            filename: coverImage.filename,
+            bytes: coverImage.bytes,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
 
   if (options.dryRun) {
     console.log(
