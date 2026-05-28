@@ -1,14 +1,17 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { User, Bot } from "lucide-react";
+import { User, Bot, Loader2 } from "lucide-react";
 
 interface ChatMessageProps {
   role: "user" | "ai" | "system";
   content: string;
+  isPending?: boolean;
+  status?: string;
 }
 
-export function ChatMessage({ role, content }: ChatMessageProps) {
+export function ChatMessage({ role, content, isPending = false, status }: ChatMessageProps) {
   const isUser = role === "user";
+  const displayContent = isPending && !content.trim() ? status || "正在处理..." : content;
 
   return (
     <div
@@ -25,13 +28,20 @@ export function ChatMessage({ role, content }: ChatMessageProps) {
       
       <div
         className={cn(
-          "max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap",
+          "max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap leading-relaxed",
           isUser
             ? "bg-brand-deep text-white rounded-br-none"
             : "bg-gray-100 text-gray-800 rounded-bl-none"
         )}
       >
-        {content}
+        {isPending && !content.trim() ? (
+          <span className="inline-flex items-center gap-2 text-gray-600">
+            <Loader2 size={14} className="animate-spin shrink-0" />
+            <span>{displayContent}</span>
+          </span>
+        ) : (
+          displayContent
+        )}
       </div>
 
       {isUser && (

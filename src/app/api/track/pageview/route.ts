@@ -1,9 +1,13 @@
-import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
+import { classifyUserAgent, detectDeviceType } from "@/lib/analytics/bot-detection";
+import {
+  clampText,
+  getClientIP,
+  getReferrerHost,
+  hashIP,
+} from "@/lib/analytics/request-metadata";
 import config from "@/payload.config";
-
-const MAX_TEXT_LENGTH = 1024;
 
 type TrackBody = {
   eventType?: string;
@@ -21,34 +25,6 @@ type TrackBody = {
   utmContent?: string;
   utmTerm?: string;
 };
-
-function clamp(value: unknown, limit = MAX_TEXT_LENGTH): string {
-  if (typeof value !== "string") return "";
-  return value.slice(0, limit).trim();
-}
-
-function getClientIP(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    return xff.split(",")[0]?.trim() || "";
-  }
-  return req.headers.get("x-real-ip") || "";
-}
-
-function hashIP(ip: string): string {
-  if (!ip) return "";
-  const secret = process.env.PAYLOAD_SECRET || "dev-secret";
-  return createHash("sha256").update(`${ip}|${secret}`).digest("hex").slice(0, 24);
-}
-
-function getReferrerHost(referrer: string): string {
-  if (!referrer) return "";
-  try {
-    return new URL(referrer).hostname;
-  } catch {
-    return "";
-  }
-}
 
 async function parseTrackBody(req: NextRequest): Promise<TrackBody | null> {
   const raw = await req.text();
@@ -73,13 +49,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true }, { status: 202 });
     }
 
-    const path = clamp(body.path, 512) || "/";
-    const query = clamp(body.query, 1024);
-    const referrer = clamp(body.referrer, 1024);
-    const pageTitle = clamp(body.pageTitle, 256);
-    const sessionId = clamp(body.sessionId, 128);
-    const userAgent = clamp(req.headers.get("user-agent"), 512);
+    const path = clampText(body.path, 512) || "/";
+    const query = clampText(body.query, 1024);
+    const referrer = clampText(body.referrer, 1024);
+    const pageTitle = clampText(body.pageTitle, 256);
+    const sessionId = clampText(body.sessionId, 128);
+    const userAgent = clampText(req.headers.get("user-agent"), 512);
     const ipHash = hashIP(getClientIP(req));
+    const classification = classifyUserAgent(userAgent);
 
     const payload = await getPayload({ config });
 
@@ -87,9 +64,9 @@ export async function POST(req: NextRequest) {
       collection: "visitorEvents",
       overrideAccess: true,
       data: {
-        eventType: clamp(body.eventType, 64) || "pageview",
-        target: clamp(body.target, 256),
-        label: clamp(body.label, 256),
+        eventType: clampText(body.eventType, 64) || "pageview",
+        target: clampText(body.target, 256),
+        label: clampText(body.label, 256),
         value: clampNumber(body.value),
         path,
         query,
@@ -99,11 +76,15 @@ export async function POST(req: NextRequest) {
         sessionId,
         ipHash,
         userAgent,
-        utmSource: clamp(body.utmSource, 128),
-        utmMedium: clamp(body.utmMedium, 128),
-        utmCampaign: clamp(body.utmCampaign, 128),
-        utmContent: clamp(body.utmContent, 128),
-        utmTerm: clamp(body.utmTerm, 128),
+        botType: classification.botType,
+        botName: classification.botName,
+        isBot: classification.isBot,
+        deviceType: detectDeviceType(userAgent, classification),
+        utmSource: clampText(body.utmSource, 128),
+        utmMedium: clampText(body.utmMedium, 128),
+        utmCampaign: clampText(body.utmCampaign, 128),
+        utmContent: clampText(body.utmContent, 128),
+        utmTerm: clampText(body.utmTerm, 128),
       },
     });
 

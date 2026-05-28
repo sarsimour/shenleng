@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { getPayload } from 'payload';
 import config from '../payload.config';
-import { getSiteUrl } from '../lib/site';
+import { getSiteUrl, publicSiteRoutes } from '../lib/site';
 
 export const dynamic = "force-dynamic";
 
@@ -9,18 +9,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getSiteUrl();
 
   // 1. 静态路由
-  const routes = [
-    '',
-    '/about',
-    '/contact',
-    '/services/container',
-    '/development',
-    '/articles',
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
+  const routes = publicSiteRoutes.map((route) => ({
+    url: `${baseUrl}${route.path === "/" ? "" : route.path}`,
     lastModified: new Date(),
     changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
+    priority: route.path === '/' ? 1 : route.path.startsWith('/services/') ? 0.85 : 0.8,
   }));
 
   // 2. 动态路由 (文章)

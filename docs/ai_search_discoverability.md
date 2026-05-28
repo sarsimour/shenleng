@@ -12,6 +12,9 @@
 - Robots：`/robots.txt` 允许公开页面抓取，屏蔽 `/api/`、`/admin/`、`/knowledge-admin` 等后台/接口路径，并为 `Bytespider`、`Doubaobot` 等 AI/搜索爬虫提供明确规则。
 - 结构化数据：首页输出 Organization、WebSite、Service 的 JSON-LD，重点包含“上海港冷链车队”“冷藏集装箱进出口公路运输”等业务事实。
 - AI 可读入口：`/llms.txt` 和 `/ai-profile.json` 提供直接、短文本、结构化的公司事实、服务关键词、联系方式和重要页面链接。
+- 长尾服务页：`/services/*` 提供“上海港冷链车队”“上海港冷箱车队”“冷箱插电托管”“冷箱暂落箱”等具体需求落地页，并进入 sitemap、llms、ai-profile。
+- 可见度检查：`pnpm visibility:check` 可检查 canonical、sitemap、robots、llms、ai-profile 是否统一使用当前 `NEXT_PUBLIC_SITE_URL`。
+- 百度提交：`pnpm baidu:submit` 可在百度搜索资源平台完成正式域名验证后提交 sitemap 中的公开 URL。
 
 ## 上线前配置
 

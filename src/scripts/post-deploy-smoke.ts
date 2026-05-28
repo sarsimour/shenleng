@@ -18,6 +18,7 @@ async function run() {
 
   let createdArticle: PayloadDoc | null = null;
   let createdEvent: PayloadDoc | null = null;
+  let createdRequestLog: PayloadDoc | null = null;
 
   try {
     console.log(`🧪 Smoke start. baseURL=${baseURL}`);
@@ -114,8 +115,59 @@ async function run() {
 
     createdEvent = eventResult.docs[0] as PayloadDoc;
     console.log("✅ Visitor event persisted.");
+
+    const requestLogRes = await fetch(`${baseURL}/api/track/request-log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(process.env.REQUEST_LOG_SHARED_SECRET
+          ? { "x-sl-request-log-secret": process.env.REQUEST_LOG_SHARED_SECRET }
+          : {}),
+      },
+      body: JSON.stringify({
+        eventType: "smoke_request",
+        source: "post_deploy_smoke",
+        method: "GET",
+        path,
+        statusCode: 200,
+        referrer: "https://www.baidu.com/s?wd=shenleng",
+        userAgent: "Baiduspider smoke validation",
+        requestId: `smoke-request-${now}`,
+      }),
+    });
+    if (!requestLogRes.ok) {
+      throw new Error(`Request log API failed: ${requestLogRes.status}`);
+    }
+
+    const requestLogResult = await payload.find({
+      collection: "siteAccessLogs",
+      where: {
+        and: [
+          { requestId: { equals: `smoke-request-${now}` } },
+          { path: { equals: path } },
+        ],
+      },
+      limit: 1,
+      sort: "-createdAt",
+    });
+
+    if (requestLogResult.totalDocs < 1) {
+      throw new Error("Site access log not found after request-log call.");
+    }
+
+    createdRequestLog = requestLogResult.docs[0] as PayloadDoc;
+    console.log("✅ Site access log persisted.");
     console.log("🎉 Smoke test passed.");
   } finally {
+    if (createdRequestLog?.id !== undefined) {
+      await payload.delete({
+        collection: "siteAccessLogs",
+        id: createdRequestLog.id,
+        overrideAccess: true,
+      });
+      console.log("🧹 Cleaned smoke site access log.");
+    }
+
     if (createdEvent?.id !== undefined) {
       await payload.delete({
         collection: "visitorEvents",

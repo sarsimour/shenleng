@@ -13,6 +13,8 @@
     "schema:sync": "NODE_ENV=development PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/build-init.ts",
     "analytics:prune": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/prune-visitor-events.ts",
     "analytics:report": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/marketing-report.ts",
+    "visibility:check": "NODE_ENV=production tsx src/scripts/check-public-visibility.ts",
+    "baidu:submit": "NODE_ENV=production tsx src/scripts/submit-baidu-urls.ts",
     "smoke:post-deploy": "NODE_ENV=production PAYLOAD_CONFIG_PATH=src/payload.config.ts tsx src/scripts/post-deploy-smoke.ts",
     "test:readiness": "playwright test tests/site-readiness.spec.ts"
   },

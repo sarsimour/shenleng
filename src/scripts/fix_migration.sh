@@ -43,4 +43,9 @@ echo "✅ 数据灌入完成！"
 echo "🔄 正在重启主服务以加载数据..."
 docker restart shenleng-container
 
-echo "🎉 修复成功！请刷新 https://www.finverse.top/articles 查看结果。"
+SITE_URL=$(docker inspect shenleng-container --format='{{range .Config.Env}}{{println .}}{{end}}' | grep NEXT_PUBLIC_SITE_URL | cut -d'=' -f2)
+if [ -z "$SITE_URL" ]; then
+    SITE_URL="当前部署域名"
+fi
+
+echo "🎉 修复成功！请刷新 ${SITE_URL}/articles 查看结果。"

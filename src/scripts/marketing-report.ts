@@ -1,6 +1,7 @@
 import { URLSearchParams } from "url";
 import nodemailer from "nodemailer";
 import { getPayload } from "payload";
+import { classifyUserAgent } from "../lib/analytics/bot-detection";
 import config from "../payload.config";
 
 type VisitorEventDoc = {
@@ -16,11 +17,39 @@ type VisitorEventDoc = {
   sessionId?: string | null;
   ipHash?: string | null;
   userAgent?: string | null;
+  botType?: string | null;
+  botName?: string | null;
+  isBot?: boolean | null;
+  deviceType?: string | null;
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
   utmContent?: string | null;
   utmTerm?: string | null;
+  createdAt?: string | null;
+};
+
+type SiteAccessLogDoc = {
+  id: number | string;
+  eventType?: string | null;
+  source?: string | null;
+  method?: string | null;
+  path?: string | null;
+  query?: string | null;
+  statusCode?: number | null;
+  durationMs?: number | null;
+  referrer?: string | null;
+  referrerHost?: string | null;
+  ipHash?: string | null;
+  userAgent?: string | null;
+  botType?: string | null;
+  botName?: string | null;
+  isBot?: boolean | null;
+  isSearchBot?: boolean | null;
+  isAIBot?: boolean | null;
+  deviceType?: string | null;
+  country?: string | null;
+  region?: string | null;
   createdAt?: string | null;
 };
 
@@ -36,9 +65,6 @@ type SessionAggregate = {
   pages: Set<string>;
   events: number;
 };
-
-const BOT_UA_PATTERN =
-  /bot|spider|crawler|curl|wget|python|scrapy|headless|lighthouse|monitor|uptime|httpclient|go-http-client|java/i;
 
 function parseNumber(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
@@ -100,9 +126,10 @@ function parseReferrerHost(referrer: string): string {
 }
 
 function isBot(event: VisitorEventDoc): boolean {
-  const ua = clean(event.userAgent).toLowerCase();
+  if (typeof event.isBot === "boolean") return event.isBot;
+  const ua = clean(event.userAgent);
   const ref = clean(event.referrerHost || parseReferrerHost(clean(event.referrer))).toLowerCase();
-  return BOT_UA_PATTERN.test(ua) || ref.includes("bot");
+  return classifyUserAgent(ua).isBot || ref.includes("bot");
 }
 
 function sortTop(map: Map<string, number>, topN: number): Array<[string, number]> {
@@ -144,6 +171,15 @@ function buildReportText(input: {
   utmCampaign: Map<string, number>;
   conversionByType: Map<string, number>;
   conversionByTarget: Map<string, number>;
+  chatFunnel: Map<string, number>;
+  requestCount: number;
+  requestStatus: Map<string, number>;
+  requestBotType: Map<string, number>;
+  requestBotName: Map<string, number>;
+  requestPathByBot: Map<string, number>;
+  searchBotPaths: Map<string, number>;
+  aiBotPaths: Map<string, number>;
+  deviceType: Map<string, number>;
   topN: number;
   includeBots: boolean;
 }): string {
@@ -166,6 +202,15 @@ function buildReportText(input: {
     utmCampaign,
     conversionByType,
     conversionByTarget,
+    chatFunnel,
+    requestCount,
+    requestStatus,
+    requestBotType,
+    requestBotName,
+    requestPathByBot,
+    searchBotPaths,
+    aiBotPaths,
+    deviceType,
     topN,
     includeBots,
   } = input;
@@ -183,6 +228,7 @@ function buildReportText(input: {
     `- Approx Unique Visitors (by ipHash): ${totalIps}`,
     `- Bounce Sessions: ${bounceSessions} (${toPercent(bounceSessions, totalSessions)})`,
     `- Avg Events / Session: ${avgEventsPerSession.toFixed(2)}`,
+    `- Server Request Logs: ${requestCount}`,
     "",
   ];
 
@@ -204,6 +250,22 @@ function buildReportText(input: {
     ...formatTopRows("Top Conversion Types", sortTop(conversionByType, topN), totalConversions),
     "",
     ...formatTopRows("Top Conversion Targets", sortTop(conversionByTarget, topN), totalConversions),
+    "",
+    ...formatTopRows("Chat Funnel", sortTop(chatFunnel, topN), totalConversions),
+    "",
+    ...formatTopRows("Device Types", sortTop(deviceType, topN), totalEvents),
+    "",
+    ...formatTopRows("Request Status Codes", sortTop(requestStatus, topN), requestCount),
+    "",
+    ...formatTopRows("Request Bot Types", sortTop(requestBotType, topN), requestCount),
+    "",
+    ...formatTopRows("Request Bot Names", sortTop(requestBotName, topN), requestCount),
+    "",
+    ...formatTopRows("Bot Request Paths", sortTop(requestPathByBot, topN), requestCount),
+    "",
+    ...formatTopRows("Search Bot Paths", sortTop(searchBotPaths, topN), requestCount),
+    "",
+    ...formatTopRows("AI Bot Paths", sortTop(aiBotPaths, topN), requestCount),
   ];
 
   return [...header, ...blocks].join("\n");
@@ -292,12 +354,46 @@ async function fetchVisitorEvents(days: number): Promise<VisitorEventDoc[]> {
   return docs;
 }
 
+async function fetchSiteAccessLogs(days: number): Promise<SiteAccessLogDoc[]> {
+  const payload = await getPayload({ config });
+  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const where = {
+    createdAt: {
+      greater_than_equal: from.toISOString(),
+    },
+  };
+
+  const docs: SiteAccessLogDoc[] = [];
+  let page = 1;
+  const limit = 1000;
+
+  while (true) {
+    const result = await payload.find({
+      collection: "siteAccessLogs",
+      where,
+      sort: "createdAt",
+      limit,
+      page,
+      overrideAccess: true,
+      depth: 0,
+    });
+
+    docs.push(...(result.docs as SiteAccessLogDoc[]));
+
+    if (page >= result.totalPages) break;
+    page += 1;
+  }
+
+  return docs;
+}
+
 async function run(): Promise<void> {
   const options = parseArgs();
   const now = new Date();
   const from = new Date(Date.now() - options.days * 24 * 60 * 60 * 1000);
 
   const rawEvents = await fetchVisitorEvents(options.days);
+  const requestLogs = await fetchSiteAccessLogs(options.days);
   const events = options.includeBots ? rawEvents : rawEvents.filter((event) => !isBot(event));
 
   const pageViewsByPath = new Map<string, number>();
@@ -309,6 +405,14 @@ async function run(): Promise<void> {
   const utmCampaign = new Map<string, number>();
   const conversionByType = new Map<string, number>();
   const conversionByTarget = new Map<string, number>();
+  const chatFunnel = new Map<string, number>();
+  const requestStatus = new Map<string, number>();
+  const requestBotType = new Map<string, number>();
+  const requestBotName = new Map<string, number>();
+  const requestPathByBot = new Map<string, number>();
+  const searchBotPaths = new Map<string, number>();
+  const aiBotPaths = new Map<string, number>();
+  const deviceType = new Map<string, number>();
   const uniqueIpHashes = new Set<string>();
   const sessions = new Map<string, SessionAggregate>();
   let totalPageviews = 0;
@@ -328,6 +432,10 @@ async function run(): Promise<void> {
     const ipHash = clean(event.ipHash);
     const createdAt = new Date(clean(event.createdAt, now.toISOString())).getTime();
     const sessionId = clean(event.sessionId, ipHash ? `ip:${ipHash}` : `event:${event.id}`);
+    const eventBot = clean(event.botType, classifyUserAgent(clean(event.userAgent)).botType);
+    const device = clean(event.deviceType, eventBot === "human" ? "(unknown)" : "bot");
+
+    increment(deviceType, device);
 
     if (eventType === "pageview") {
       totalPageviews += 1;
@@ -339,6 +447,9 @@ async function run(): Promise<void> {
       totalConversions += 1;
       increment(conversionByType, eventType);
       increment(conversionByTarget, clean(event.target, "(unspecified)"));
+      if (eventType.startsWith("chat_")) {
+        increment(chatFunnel, eventType);
+      }
     }
 
     increment(referrerByHost, referrerHost);
@@ -372,6 +483,31 @@ async function run(): Promise<void> {
     }
   }
 
+  for (const request of requestLogs) {
+    const path = clean(request.path, "/");
+    const status = request.statusCode ? String(request.statusCode) : "(not captured)";
+    const bot = classifyUserAgent(clean(request.userAgent));
+    const botType = clean(request.botType, bot.botType);
+    const botName = clean(request.botName, bot.botName || "(human)");
+    const isSearchBot = typeof request.isSearchBot === "boolean" ? request.isSearchBot : bot.isSearchBot;
+    const isAIBot = typeof request.isAIBot === "boolean" ? request.isAIBot : bot.isAIBot;
+    const isKnownBot = typeof request.isBot === "boolean" ? request.isBot : bot.isBot;
+
+    increment(requestStatus, status);
+    increment(requestBotType, botType);
+    increment(requestBotName, botName);
+
+    if (isKnownBot) {
+      increment(requestPathByBot, `${botName} ${path}`);
+    }
+    if (isSearchBot) {
+      increment(searchBotPaths, `${botName} ${path}`);
+    }
+    if (isAIBot) {
+      increment(aiBotPaths, `${botName} ${path}`);
+    }
+  }
+
   const totalEvents = events.length;
   const totalSessions = sessions.size;
   const bounceSessions = [...sessions.values()].filter((session) => session.pages.size <= 1).length;
@@ -396,11 +532,20 @@ async function run(): Promise<void> {
     utmCampaign,
     conversionByType,
     conversionByTarget,
+    chatFunnel,
+    requestCount: requestLogs.length,
+    requestStatus,
+    requestBotType,
+    requestBotName,
+    requestPathByBot,
+    searchBotPaths,
+    aiBotPaths,
+    deviceType,
     topN: options.topN,
     includeBots: options.includeBots,
   });
 
-  const subject = `Finverse 营销分析报告 ${now.toISOString().slice(0, 10)} (last ${options.days}d)`;
+  const subject = `申冷官网营销分析报告 ${now.toISOString().slice(0, 10)} (last ${options.days}d)`;
   console.log(reportText);
 
   await sendEmailReport(subject, reportText);

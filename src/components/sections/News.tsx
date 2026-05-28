@@ -15,6 +15,7 @@ type ArticleListItem = {
   baseViews?: number;
   coverImage?: {
     filename?: string;
+    url?: string;
   } | null;
 };
 
@@ -62,10 +63,11 @@ export default async function News() {
               ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
               : "";
             
-            // 使用 filename 手动拼接路径，确保与 Next.js 静态目录匹配
-            const coverImageUrl = article.coverImage?.filename 
-              ? `/media/${article.coverImage.filename}` 
-              : null;
+            const coverImageUrl =
+              article.coverImage?.url ||
+              (article.coverImage?.filename
+                ? `/api/media/file/${article.coverImage.filename}`
+                : null);
 
             return (
               <article key={article.id} className="flex flex-col group cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">

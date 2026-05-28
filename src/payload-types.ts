@@ -70,6 +70,7 @@ export interface Config {
     articles: Article;
     media: Media;
     visitorEvents: VisitorEvent;
+    siteAccessLogs: SiteAccessLog;
     users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -81,6 +82,7 @@ export interface Config {
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     visitorEvents: VisitorEventsSelect<false> | VisitorEventsSelect<true>;
+    siteAccessLogs: SiteAccessLogsSelect<false> | SiteAccessLogsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -201,11 +203,44 @@ export interface VisitorEvent {
   sessionId?: string | null;
   ipHash?: string | null;
   userAgent?: string | null;
+  botType?: string | null;
+  botName?: string | null;
+  isBot?: boolean | null;
+  deviceType?: string | null;
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
   utmContent?: string | null;
   utmTerm?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "siteAccessLogs".
+ */
+export interface SiteAccessLog {
+  id: number;
+  eventType: string;
+  source?: string | null;
+  method: string;
+  path: string;
+  query?: string | null;
+  statusCode?: number | null;
+  durationMs?: number | null;
+  referrer?: string | null;
+  referrerHost?: string | null;
+  ipHash?: string | null;
+  userAgent?: string | null;
+  botType?: string | null;
+  botName?: string | null;
+  isBot?: boolean | null;
+  isSearchBot?: boolean | null;
+  isAIBot?: boolean | null;
+  deviceType?: string | null;
+  country?: string | null;
+  region?: string | null;
+  requestId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -268,6 +303,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'visitorEvents';
         value: number | VisitorEvent;
+      } | null)
+    | ({
+        relationTo: 'siteAccessLogs';
+        value: number | SiteAccessLog;
       } | null)
     | ({
         relationTo: 'users';
@@ -370,11 +409,43 @@ export interface VisitorEventsSelect<T extends boolean = true> {
   sessionId?: T;
   ipHash?: T;
   userAgent?: T;
+  botType?: T;
+  botName?: T;
+  isBot?: T;
+  deviceType?: T;
   utmSource?: T;
   utmMedium?: T;
   utmCampaign?: T;
   utmContent?: T;
   utmTerm?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "siteAccessLogs_select".
+ */
+export interface SiteAccessLogsSelect<T extends boolean = true> {
+  eventType?: T;
+  source?: T;
+  method?: T;
+  path?: T;
+  query?: T;
+  statusCode?: T;
+  durationMs?: T;
+  referrer?: T;
+  referrerHost?: T;
+  ipHash?: T;
+  userAgent?: T;
+  botType?: T;
+  botName?: T;
+  isBot?: T;
+  isSearchBot?: T;
+  isAIBot?: T;
+  deviceType?: T;
+  country?: T;
+  region?: T;
+  requestId?: T;
   updatedAt?: T;
   createdAt?: T;
 }

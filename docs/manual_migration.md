@@ -40,4 +40,4 @@ docker restart shenleng-container
 *   **Permission Denied**: 如果报错 14 或无法创建文件，说明 `persistence` 目录权限不对。请先执行 `chmod -R 777 persistence`。
 *   **Images not found**: 检查 `~/shenleng_data_source/public/images` 是否存在。
 
-运行成功后，访问 `https://www.finverse.top/articles` 即可看到文章。
+运行成功后，访问 `${NEXT_PUBLIC_SITE_URL}/articles` 即可看到文章。测试期和正式上线期都必须以当前部署环境的 `NEXT_PUBLIC_SITE_URL` 为准，避免旧域名或测试域名混入公开文档。

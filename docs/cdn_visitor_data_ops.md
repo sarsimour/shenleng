@@ -60,10 +60,13 @@
 - 生成近 7 天报告：`pnpm analytics:report -- --days=7`
 - 自定义 Top N：`pnpm analytics:report -- --days=14 --top=15`
 - 默认会过滤机器人流量；如需包含机器人：`pnpm analytics:report -- --include-bots=true`
+- 当前报告会同时汇总前端访客事件和 `siteAccessLogs` 服务端访问日志，输出搜索爬虫、AI 爬虫、请求状态码、核心路径访问和 AI 客服漏斗。
 
 环境变量（配置任意一种推送）：
 - 邮件推送：`ANALYTICS_REPORT_TO`、`ANALYTICS_REPORT_FROM`、`SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS`
 - Webhook 推送：`ANALYTICS_WEBHOOK_URL`
+- 服务端请求日志密钥（可选）：`REQUEST_LOG_SHARED_SECRET`；未配置时接口仍可写入，但有基础频率限制。
+- 请求日志留存天数（可选）：`REQUEST_LOG_RETENTION_DAYS`，默认 90 天
 
 建议定时任务（每天 08:30 发送前一天滚动周报）：
 ```cron
@@ -71,8 +74,46 @@
 ```
 
 ## 6. 新文章发布 SOP（当前线上流程）
-1. 进入后台：`https://www.finverse.top/admin`
+
+> URL 必须以当前部署环境的 `NEXT_PUBLIC_SITE_URL` 为准。测试期可使用测试域名；正式上线后必须只使用正式官网域名，不要沿用旧域名示例。
+
+1. 进入后台：`${NEXT_PUBLIC_SITE_URL}/admin`
 2. `Articles -> Create New`，填写 `title / slug / summary / content / publishedAt`
-3. 保存并发布后，访问 `https://www.finverse.top/articles/{slug}` 验证内容
-4. 验证 sitemap：`https://www.finverse.top/sitemap.xml` 中应出现新文章 URL
+3. 保存并发布后，访问 `${NEXT_PUBLIC_SITE_URL}/articles/{slug}` 验证内容
+4. 验证 sitemap：`${NEXT_PUBLIC_SITE_URL}/sitemap.xml` 中应出现新文章 URL
 5. 发版后跑一次：`pnpm smoke:post-deploy`（自动创建并清理测试文章）
+
+## 7. SEO/AI 可见度检查
+
+正式域名上线前后执行：
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://正式官网域名 pnpm visibility:check
+```
+
+检查内容：
+- 首页 canonical 是否使用当前 `NEXT_PUBLIC_SITE_URL`。
+- `robots.txt` 的 sitemap 是否使用当前域名。
+- `sitemap.xml`、`llms.txt`、`ai-profile.json` 是否能访问。
+- 是否混入旧域名、测试域名、IP、localhost。
+- AI 可读文件是否包含申冷、上海港冷链车队、冷藏集装箱等核心公开事实。
+
+## 8. 百度普通收录提交
+
+百度搜索资源平台验证正式域名后，配置以下任一方式：
+
+```bash
+BAIDU_PUSH_ENDPOINT="https://data.zz.baidu.com/urls?site=...&token=..." pnpm baidu:submit
+```
+
+或：
+
+```bash
+BAIDU_SITE=https://正式官网域名 BAIDU_TOKEN=平台token pnpm baidu:submit
+```
+
+发布前可先 dry-run：
+
+```bash
+BAIDU_DRY_RUN=true pnpm baidu:submit
+```

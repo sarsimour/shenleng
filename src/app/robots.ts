@@ -12,6 +12,21 @@ export default function robots(): MetadataRoute.Robots {
         disallow: privatePaths,
       },
       {
+        userAgent: 'Baiduspider',
+        allow: '/',
+        disallow: privatePaths,
+      },
+      {
+        userAgent: 'Sogou web spider',
+        allow: '/',
+        disallow: privatePaths,
+      },
+      {
+        userAgent: '360Spider',
+        allow: '/',
+        disallow: privatePaths,
+      },
+      {
         userAgent: 'Bytespider',
         allow: '/',
         disallow: privatePaths,

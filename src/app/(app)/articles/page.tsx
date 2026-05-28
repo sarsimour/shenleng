@@ -27,6 +27,7 @@ type ArticleIndexItem = {
   baseViews?: number | null;
   coverImage?: {
     filename?: string | null;
+    url?: string | null;
   } | null;
 };
 
@@ -63,9 +64,11 @@ export default async function ArticlesIndex() {
               ? new Date(article.publishedAt).toLocaleDateString('zh-CN') 
               : "";
             
-            const coverImageUrl = article.coverImage?.filename 
-              ? `/media/${article.coverImage.filename}` 
-              : null;
+            const coverImageUrl =
+              article.coverImage?.url ||
+              (article.coverImage?.filename
+                ? `/api/media/file/${article.coverImage.filename}`
+                : null);
 
             return (
               <article key={article.id} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group">

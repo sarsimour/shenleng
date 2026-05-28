@@ -1,3 +1,5 @@
+import { serviceLandingPages } from "./service-pages";
+
 export const DEFAULT_SITE_URL = "http://localhost:3000";
 
 const MISSING_SITE_URL_MESSAGE =
@@ -111,4 +113,9 @@ export const publicSiteRoutes = [
     title: "联系我们",
     summary: "电话、邮箱、手机和地址。",
   },
+  ...serviceLandingPages.map((page) => ({
+    path: page.path,
+    title: page.shortTitle,
+    summary: page.summary,
+  })),
 ];

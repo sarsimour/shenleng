@@ -19,6 +19,12 @@ const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
 const REQUIRED_CHATBOT_ID = process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID?.trim() || "";
 const CONFIGURED_CHATBOT_NAME =
   process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME?.trim() || "申冷售前顾问";
+const RESPONSE_STATUS_STEPS = [
+  { delayMs: 0, text: "正在连接申冷售前顾问..." },
+  { delayMs: 3500, text: "正在识别您的运输需求..." },
+  { delayMs: 7500, text: "正在整理冷链运输建议，首次回复可能需要多等几秒..." },
+  { delayMs: 12000, text: "仍在处理中；如很着急，也可以直接拨打 021-38930219。" },
+] as const;
 
 function buildMessageAnalyticsLabel(message: string): string {
   const length = [...message].length;
@@ -32,9 +38,27 @@ export function ChatWindow() {
   const [messages, setMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [responseStatus, setResponseStatus] = useState<string>(RESPONSE_STATUS_STEPS[0].text);
   const [chatbot, setChatbot] = useState<Chatbot | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const responseStatusTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function clearResponseStatusTimers() {
+    responseStatusTimersRef.current.forEach((timer) => clearTimeout(timer));
+    responseStatusTimersRef.current = [];
+  }
+
+  function startResponseStatusTimers() {
+    clearResponseStatusTimers();
+    setResponseStatus(RESPONSE_STATUS_STEPS[0].text);
+
+    responseStatusTimersRef.current = RESPONSE_STATUS_STEPS.slice(1).map((step) =>
+      setTimeout(() => {
+        setResponseStatus(step.text);
+      }, step.delayMs),
+    );
+  }
 
   // Initialize Chat
   useEffect(() => {
@@ -106,6 +130,8 @@ export function ChatWindow() {
     }
   }, [messages]);
 
+  useEffect(() => clearResponseStatusTimers, []);
+
   const handleSend = async () => {
     if (!input.trim() || !chatbot || !sessionId || isLoading) return;
 
@@ -113,6 +139,7 @@ export function ChatWindow() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setIsLoading(true);
+    startResponseStatusTimers();
     trackSiteEvent({
       eventType: "chat_message_sent",
       target: "chat_window",
@@ -128,14 +155,26 @@ export function ChatWindow() {
       const stream = sendMessageStream(chatbot.id, sessionId, userMsg);
       
       let fullContent = "";
+      let firstChunkTracked = false;
       
       for await (const chunk of stream) {
+        if (!firstChunkTracked) {
+          firstChunkTracked = true;
+          clearResponseStatusTimers();
+          trackSiteEvent({
+            eventType: "chat_response_first_chunk",
+            target: "chat_window",
+            label: "ok",
+            value: Math.round(performance.now() - startedAt),
+          });
+        }
+
         fullContent += chunk;
         setMessages((prev) => {
           const newMsgs = [...prev];
           const lastMsg = newMsgs[newMsgs.length - 1];
           if (lastMsg.role === "ai") {
-            lastMsg.content = fullContent;
+            newMsgs[newMsgs.length - 1] = { ...lastMsg, content: fullContent };
           }
           return newMsgs;
         });
@@ -157,6 +196,8 @@ export function ChatWindow() {
       });
       setMessages((prev) => [...prev, { role: "ai", content: "抱歉，出错了，请稍后再试。" }]);
     } finally {
+      clearResponseStatusTimers();
+      setResponseStatus(RESPONSE_STATUS_STEPS[0].text);
       setIsLoading(false);
     }
   };
@@ -182,9 +223,20 @@ export function ChatWindow() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50" ref={scrollRef}>
-        {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} />
-        ))}
+        {messages.map((msg, idx) => {
+          const isPendingResponse =
+            isLoading && idx === messages.length - 1 && msg.role === "ai" && !msg.content.trim();
+
+          return (
+            <ChatMessage
+              key={idx}
+              role={msg.role}
+              content={msg.content}
+              isPending={isPendingResponse}
+              status={responseStatus}
+            />
+          );
+        })}
         
         {/* 电话拨打按钮 - AI 未连通时保持可见 */}
         {(!sessionId || !chatbot) && (
