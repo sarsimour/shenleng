@@ -7,7 +7,14 @@ export interface Chatbot {
   id: string;
   name: string;
   description: string;
-  avatar_url?: string;
+  avatar?: ChatbotAvatar | string | null;
+  avatar_url?: string | null;
+}
+
+export interface ChatbotAvatar {
+  inner_url?: string | null;
+  public_url?: string | null;
+  content_type?: string | null;
 }
 
 export interface ChatMessage {
@@ -174,6 +181,42 @@ export async function getChatbots(): Promise<Chatbot[]> {
   const res = await authedFetch(`${API_BASE}/chatbots`);
   if (!res.ok) throw new Error("Failed to fetch chatbots");
   return res.json();
+}
+
+export async function getChatbot(chatbotId: string): Promise<Chatbot> {
+  const res = await authedFetch(`${API_BASE}/chatbots/${chatbotId}`);
+  if (!res.ok) throw new Error("Failed to fetch chatbot");
+  const data = await res.json();
+  const chatbot = data?.chatbot ?? data;
+
+  if (!chatbot || typeof chatbot.id !== "string") {
+    throw new Error("Chatbot response missing chatbot");
+  }
+
+  return chatbot;
+}
+
+export function getChatbotAvatarUrl(chatbot: Pick<Chatbot, "avatar" | "avatar_url"> | null): string | undefined {
+  if (!chatbot) return undefined;
+
+  if (typeof chatbot.avatar_url === "string" && chatbot.avatar_url.trim()) {
+    return chatbot.avatar_url;
+  }
+
+  if (typeof chatbot.avatar === "string" && chatbot.avatar.startsWith("http")) {
+    return chatbot.avatar;
+  }
+
+  if (
+    chatbot.avatar &&
+    typeof chatbot.avatar === "object" &&
+    typeof chatbot.avatar.public_url === "string" &&
+    chatbot.avatar.public_url.trim()
+  ) {
+    return chatbot.avatar.public_url;
+  }
+
+  return undefined;
 }
 
 export async function startChatSession(chatbotId: string): Promise<string> {

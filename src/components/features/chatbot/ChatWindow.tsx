@@ -4,7 +4,13 @@ import React, { useEffect, useState, useRef } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { X, Send, Loader2, Phone } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
-import { startChatSession, sendMessageStream, Chatbot } from "@/lib/chatbot-api";
+import {
+  startChatSession,
+  sendMessageStream,
+  getChatbot,
+  getChatbotAvatarUrl,
+  Chatbot,
+} from "@/lib/chatbot-api";
 import { trackSiteEvent } from "@/components/analytics/VisitorTracker";
 
 const WELCOME_MESSAGE = `👋 您好！欢迎咨询申冷物流。
@@ -20,10 +26,10 @@ const REQUIRED_CHATBOT_ID = process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID?.trim()
 const CONFIGURED_CHATBOT_NAME =
   process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME?.trim() || "申冷售前顾问";
 const RESPONSE_STATUS_STEPS = [
-  { delayMs: 0, text: "正在连接申冷售前顾问..." },
-  { delayMs: 3500, text: "正在识别您的运输需求..." },
-  { delayMs: 7500, text: "正在整理冷链运输建议，首次回复可能需要多等几秒..." },
-  { delayMs: 12000, text: "仍在处理中；如很着急，也可以直接拨打 021-38930219。" },
+  { delayMs: 0, text: "正在思考您的问题..." },
+  { delayMs: 3500, text: "正在核对申冷冷链服务范围..." },
+  { delayMs: 7500, text: "正在整理更准确的运输建议，首次回复可能需要多等几秒..." },
+  { delayMs: 12000, text: "还在处理中；如果很着急，可以直接拨打 021-38930219。" },
 ] as const;
 
 function buildMessageAnalyticsLabel(message: string): string {
@@ -92,6 +98,19 @@ export function ChatWindow() {
         };
         setChatbot(fixedBot);
 
+        void getChatbot(REQUIRED_CHATBOT_ID)
+          .then((chatbotMetadata) => {
+            setChatbot({
+              ...fixedBot,
+              ...chatbotMetadata,
+              id: REQUIRED_CHATBOT_ID,
+              name: chatbotMetadata.name || fixedBot.name,
+              description: chatbotMetadata.description || fixedBot.description,
+            });
+          })
+          .catch((metadataError) => {
+            console.warn("Failed to fetch configured chatbot metadata", metadataError);
+          });
         const sid = await startChatSession(REQUIRED_CHATBOT_ID);
         setSessionId(sid);
         trackSiteEvent({
@@ -234,6 +253,7 @@ export function ChatWindow() {
               content={msg.content}
               isPending={isPendingResponse}
               status={responseStatus}
+              avatarUrl={getChatbotAvatarUrl(chatbot)}
             />
           );
         })}

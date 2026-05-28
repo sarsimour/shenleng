@@ -14,6 +14,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const SERVER_APP_ID = process.env.NEXT_PUBLIC_VERSECORE_APP_ID?.trim() || "logistics-web";
+const CONFIGURED_CHATBOT_ID = process.env.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID?.trim() || "";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -88,6 +89,16 @@ function isUuid(value: string | undefined): boolean {
 
 function isAllowedChatbotRoute(method: string, pathSegments: string[]): boolean {
   const [resource, chatbotId, chat, sessionId, action] = pathSegments;
+
+  if (
+    method === "GET" &&
+    resource === "chatbots" &&
+    pathSegments.length === 2 &&
+    isUuid(chatbotId) &&
+    chatbotId === CONFIGURED_CHATBOT_ID
+  ) {
+    return true;
+  }
 
   if (resource !== "chatbots" || !isUuid(chatbotId) || chat !== "chat") {
     return false;

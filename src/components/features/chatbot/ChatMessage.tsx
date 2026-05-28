@@ -7,9 +7,10 @@ interface ChatMessageProps {
   content: string;
   isPending?: boolean;
   status?: string;
+  avatarUrl?: string;
 }
 
-export function ChatMessage({ role, content, isPending = false, status }: ChatMessageProps) {
+export function ChatMessage({ role, content, isPending = false, status, avatarUrl }: ChatMessageProps) {
   const isUser = role === "user";
   const displayContent = isPending && !content.trim() ? status || "正在处理..." : content;
 
@@ -21,8 +22,17 @@ export function ChatMessage({ role, content, isPending = false, status }: ChatMe
       )}
     >
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-brand-deep/10 flex items-center justify-center shrink-0">
-          <Bot size={16} className="text-brand-deep" />
+        <div className="w-8 h-8 overflow-hidden rounded-full bg-brand-deep/10 flex items-center justify-center shrink-0">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt="申冷 AI 助手"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Bot size={16} className="text-brand-deep" />
+          )}
         </div>
       )}
       
