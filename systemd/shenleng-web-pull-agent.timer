@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Shenleng web artifact manifest every two minutes
+
+[Timer]
+OnBootSec=120s
+OnUnitActiveSec=120s
+AccuracySec=30s
+Unit=shenleng-web-pull-agent.service
+
+[Install]
+WantedBy=timers.target

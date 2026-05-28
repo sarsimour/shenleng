@@ -1,0 +1,12 @@
+[Unit]
+Description=Shenleng web artifact pull deploy
+After=network-online.target shenleng-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile={{PROJECT_DIR}}/.deploy-pull.env
+ExecStart={{PROJECT_DIR}}/scripts/deploy-web-pull-agent.sh --yes
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6

@@ -1,0 +1,89 @@
+name: Publish Shenleng Web Artifact to OSS
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: shenleng-web-oss-artifact
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ARTIFACT_NAME: shenleng-web-standalone.tgz
+
+jobs:
+  build-and-publish-oss:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies on GitHub runner
+        run: npm ci --legacy-peer-deps
+
+      - name: Build standalone artifact on GitHub runner
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          PAYLOAD_SECRET: build_secret_placeholder
+          DATABASE_URI: file:./payload-build.db
+          PAYLOAD_CONFIG_PATH: src/payload.config.ts
+          NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID || 'logistics-web' }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME || '申冷售前顾问' }}
+          NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+
+          : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
+          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
+
+          npm run generate:importmap
+          /usr/bin/time -v npm run build
+
+          rm -rf artifact-root
+          mkdir -p artifact-root/.next
+          rsync -a .next/standalone/ artifact-root/
+          rsync -a .next/static/ artifact-root/.next/static/
+          rsync -a --exclude media --exclude images public/ artifact-root/public/
+          mkdir -p artifact-root/src/app
+          rsync -a src/payload.config.ts src/payload-types.ts artifact-root/src/
+          rsync -a src/collections artifact-root/src/
+          rsync -a src/lib artifact-root/src/
+          rsync -a src/scripts artifact-root/src/
+          rsync -a src/app/sitemap.ts artifact-root/src/app/
+          if [ -d redirects ]; then
+            rsync -a redirects/ artifact-root/redirects/
+          fi
+
+          tar -C artifact-root -czf "$ARTIFACT_NAME" .
+          sha256sum "$ARTIFACT_NAME"
+          ls -lh "$ARTIFACT_NAME"
+
+      - name: Publish artifact manifest to OSS
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          ALIYUN_OSS_BUCKET: ${{ secrets.ALIYUN_OSS_BUCKET }}
+          ALIYUN_OSS_ENDPOINT: ${{ secrets.ALIYUN_OSS_ENDPOINT }}
+          ALIYUN_OSS_PREFIX: ${{ secrets.ALIYUN_OSS_PREFIX || 'shenleng/web' }}
+          ALIYUN_OSS_PUBLIC_BASE_URL: ${{ secrets.ALIYUN_OSS_PUBLIC_BASE_URL }}
+          ALIYUN_OSS_OBJECT_ACL: ${{ secrets.ALIYUN_OSS_OBJECT_ACL }}
+        run: |
+          set -euo pipefail
+
+          : "${ALIYUN_ACCESS_KEY_ID:?ALIYUN_ACCESS_KEY_ID is required}"
+          : "${ALIYUN_ACCESS_KEY_SECRET:?ALIYUN_ACCESS_KEY_SECRET is required}"
+          : "${ALIYUN_OSS_BUCKET:?ALIYUN_OSS_BUCKET is required}"
+          : "${ALIYUN_OSS_ENDPOINT:?ALIYUN_OSS_ENDPOINT is required}"
+
+          python -m pip install --disable-pip-version-check oss2
+          python scripts/publish-oss-artifact.py --artifact "$ARTIFACT_NAME" > oss-publish-result.json
+          cat oss-publish-result.json

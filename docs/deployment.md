@@ -83,6 +83,66 @@ WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
 
 当前 GitHub Actions 上传 artifact 和执行远端脚本仍依赖 SSH/SCP。它已经避免了 ECS 构建、镜像拉取和服务器重启，但还不是最终的“无 SSH 发布”。如果要彻底去掉 SSH，需要改为 GitHub 上传 OSS artifact 和 manifest，ECS 上的 pull agent 定时拉取并调用 `deploy-web-light.sh`。
 
+## 无 SSH 发布试验路径（OSS manifest pull）
+
+为了解决 SSH 经常不可用的问题，新增一条手动试验链路：
+
+```text
+GitHub Actions 构建 standalone artifact
+  -> 上传到 OSS
+  -> 写 manifest.json
+  -> ECS pull agent 定时读取 manifest
+  -> 下载 artifact
+  -> 校验 sha256
+  -> 调用 scripts/deploy-web-light.sh
+```
+
+相关文件：
+
+- `.github/workflows/deploy-oss-artifact.yml`
+- `scripts/publish-oss-artifact.py`
+- `scripts/deploy-web-pull-agent.sh`
+- `scripts/install-web-pull-agent-systemd.sh`
+- `systemd/shenleng-web-pull-agent.service.template`
+- `systemd/shenleng-web-pull-agent.timer`
+
+这条链路的资源消耗：
+
+- GitHub Runner 负责 `npm ci` 和 `npm run build`
+- ECS 只负责下载、sha256 校验、解压、候选端口验证和切换
+- ECS 不执行 `npm install`
+- ECS 不执行 `npm run build`
+- ECS 不执行 `docker build`
+- ECS 不执行 `docker pull`
+- ECS 不重启
+
+GitHub workflow 需要这些 Secrets：
+
+| Secret | 用途 |
+|---|---|
+| `ALIYUN_ACCESS_KEY_ID` | 上传 OSS 的 RAM AccessKey |
+| `ALIYUN_ACCESS_KEY_SECRET` | 上传 OSS 的 RAM Secret |
+| `ALIYUN_OSS_BUCKET` | OSS bucket 名称 |
+| `ALIYUN_OSS_ENDPOINT` | OSS endpoint，例如 `https://oss-cn-shanghai.aliyuncs.com` |
+| `ALIYUN_OSS_PREFIX` | 可选，默认 `shenleng/web` |
+| `ALIYUN_OSS_PUBLIC_BASE_URL` | 可选，manifest 中生成的公开访问前缀 |
+| `ALIYUN_OSS_OBJECT_ACL` | 可选，`public-read` 或 `private` |
+
+ECS 安装 pull agent 示例：
+
+```bash
+cd /home/ecs-user/Projects/shenleng
+
+scripts/install-web-pull-agent-systemd.sh \
+  --project-dir /home/ecs-user/Projects/shenleng \
+  --manifest-url https://<bucket>.<endpoint>/shenleng/web/manifest.json \
+  --public-url https://shenleng.roinland.com
+```
+
+安装后日常发布不再需要 SSH。GitHub 只需要更新 OSS 上的 `manifest.json`；ECS 每 2 分钟检查一次，有新版本就拉取并部署。
+
+注意：第一次安装 pull agent 仍需要一次控制通道。可以是 SSH、云助手、Workbench 或迁移镜像预装。安装后，日常前端发布可以不依赖 SSH。
+
 ## 旧镜像架构（仅运行环境变化时参考）
 
 ```

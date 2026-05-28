@@ -213,3 +213,31 @@ GitHub Runner 构建 artifact
 -> 下载并校验 sha256
 -> 调用 deploy-web-light.sh 候选验证和切换
 ```
+
+仓库已经提供试验实现：
+
+```text
+.github/workflows/deploy-oss-artifact.yml
+scripts/publish-oss-artifact.py
+scripts/deploy-web-pull-agent.sh
+scripts/install-web-pull-agent-systemd.sh
+systemd/shenleng-web-pull-agent.service.template
+systemd/shenleng-web-pull-agent.timer
+```
+
+安装到 ECS：
+
+```bash
+scripts/install-web-pull-agent-systemd.sh \
+  --project-dir /home/ecs-user/Projects/shenleng \
+  --manifest-url https://<bucket>.<endpoint>/shenleng/web/manifest.json \
+  --public-url https://shenleng.roinland.com
+```
+
+安装后会启用：
+
+```text
+shenleng-web-pull-agent.timer
+```
+
+它每 2 分钟读取一次 manifest。发现新版本后下载 artifact、校验 sha256，并调用 `deploy-web-light.sh`。这个过程不依赖 SSH，不在 ECS 上构建，也不重启服务器。
