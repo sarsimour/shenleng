@@ -49,6 +49,15 @@ Example:
 
 `legacyHtml` can be embedded directly instead of using `legacyHtmlPath`.
 
+The publisher also accepts migrated article JSON files under `data/nextjs_content/content/json/*.json`.
+For those files it maps:
+
+- `description` -> `summary`
+- `content_html` -> `legacyHtml`
+- `views` -> `baseViews`
+- `date` -> `publishedAt`
+- `featured_image` -> cover image path under `public/images`
+
 ## Local Publish
 
 ```bash
@@ -68,6 +77,13 @@ Use `.github/workflows/publish-content.yml` with manual dispatch:
 
 ```text
 content_file: content/articles/example/content.json
+site_url: https://shenleng.roinland.com
+```
+
+Existing migrated content can be re-published the same way:
+
+```text
+content_file: data/nextjs_content/content/json/shang-hai-gang-jin-kou-leng-xiang-jin-ji-shu-gang-che-dui.json
 site_url: https://shenleng.roinland.com
 ```
 

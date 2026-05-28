@@ -21,6 +21,16 @@ type ContentSpec = {
   };
 };
 
+type MigratedContentSpec = {
+  title?: unknown;
+  slug?: unknown;
+  description?: unknown;
+  content_html?: unknown;
+  featured_image?: unknown;
+  views?: unknown;
+  date?: unknown;
+};
+
 type CliOptions = {
   specPath: string;
   siteUrl: string;
@@ -31,6 +41,8 @@ function usage(): never {
   console.error(
     [
       "Usage: pnpm content:publish [--site https://shenleng.roinland.com] [--dry-run] <content.json>",
+      "",
+      "The content file can be a publish spec or a migrated data/nextjs_content JSON file.",
       "",
       "Required env:",
       "  CONTENT_PUBLISH_TOKEN",
@@ -80,12 +92,60 @@ function assertString(value: unknown, field: string) {
   return value.trim();
 }
 
+function optionalString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function optionalInteger(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value);
+  return 0;
+}
+
+function normalizeFeaturedImagePath(featuredImage: string) {
+  const normalized = featuredImage.trim();
+  if (!normalized) {
+    throw new Error("featured_image is required");
+  }
+
+  if (path.isAbsolute(normalized) && !normalized.startsWith("/images/")) {
+    throw new Error("absolute featured_image paths are not supported for migrated content");
+  }
+
+  if (normalized.startsWith("/images/")) {
+    return path.resolve(process.cwd(), "public", normalized.replace(/^\/+/, ""));
+  }
+
+  return normalized;
+}
+
+function isMigratedContentSpec(raw: Partial<ContentSpec> & MigratedContentSpec) {
+  return typeof raw.content_html === "string" || typeof raw.featured_image === "string";
+}
+
 function normalizeSpec(raw: unknown): ContentSpec {
   if (!raw || typeof raw !== "object") {
     throw new Error("content spec must be an object");
   }
 
-  const spec = raw as Partial<ContentSpec>;
+  const spec = raw as Partial<ContentSpec> & MigratedContentSpec;
+  if (isMigratedContentSpec(spec)) {
+    const featuredImage = assertString(spec.featured_image, "featured_image");
+    return {
+      title: assertString(spec.title, "title"),
+      slug: assertString(spec.slug, "slug"),
+      summary: optionalString(spec.description),
+      legacyHtml: assertString(spec.content_html, "content_html"),
+      baseViews: optionalInteger(spec.views),
+      publishedAt: optionalString(spec.date) || undefined,
+      coverImage: {
+        path: normalizeFeaturedImagePath(featuredImage),
+        filename: path.basename(featuredImage),
+        alt: assertString(spec.title, "title"),
+      },
+    };
+  }
+
   const coverImage = spec.coverImage;
   if (!coverImage || typeof coverImage !== "object") {
     throw new Error("coverImage is required");

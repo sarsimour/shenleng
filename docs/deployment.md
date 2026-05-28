@@ -104,6 +104,8 @@ WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
 
 生产环境必须设置 `CONTENT_PUBLISH_TOKEN`，GitHub workflow 使用同名 repository secret。日常内容发布不要使用 SSH、SCP、Cloud Assistant，也不要让服务器下载外部图片。
 
+`src/scripts/publish-content.ts` 支持两类输入：新的发布 spec，以及仓库里已有的 `data/nextjs_content/content/json/*.json` 迁移文章。迁移文章会在 GitHub Runner 上读取 `public/images` 封面图、本地压缩后再通过 HTTPS 写入线上。
+
 ## 无 SSH 发布路径（R2 manifest pull）
 
 为了解决 SSH 经常不可用的问题，默认发布链路是：
