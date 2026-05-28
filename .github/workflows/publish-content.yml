@@ -1,0 +1,51 @@
+name: Publish Shenleng Content
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_file:
+        description: "Repository path to the content JSON spec"
+        required: true
+        type: string
+      site_url:
+        description: "Target site URL"
+        required: true
+        default: "https://shenleng.roinland.com"
+        type: string
+
+concurrency:
+  group: shenleng-content-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install publisher dependencies on GitHub runner
+        run: npm ci --legacy-peer-deps
+
+      - name: Publish content over HTTPS
+        env:
+          CONTENT_PUBLISH_TOKEN: ${{ secrets.CONTENT_PUBLISH_TOKEN }}
+          CONTENT_FILE: ${{ inputs.content_file }}
+          SITE_URL: ${{ inputs.site_url }}
+        run: |
+          set -euo pipefail
+
+          : "${CONTENT_PUBLISH_TOKEN:?CONTENT_PUBLISH_TOKEN secret is required}"
+          test -f "$CONTENT_FILE"
+
+          npm run content:publish -- --site "$SITE_URL" "$CONTENT_FILE"

@@ -83,6 +83,27 @@ WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
 
 默认 workflow 不把运行时 `.env` 写入 ECS。运行时环境由服务器上的 `/home/ecs-user/Projects/shenleng/.env` 管理；只有 `NEXT_PUBLIC_*` 这类构建期公开变量来自 GitHub Secrets 并写入 artifact。
 
+## 内容轻量发布（文章和封面图）
+
+文章、封面图这类内容更新不走前端 artifact，不触发构建，不重启 `shenleng-web`。默认路径是：
+
+```text
+本机或 GitHub Runner 准备文章 JSON 和封面图
+  -> 本机/Runner 压缩封面图
+  -> HTTPS POST /api/content-publish
+  -> 服务器写入 persistence/media 和 SQLite
+  -> revalidate /articles、文章页、sitemap
+```
+
+相关文件：
+
+- `src/app/api/content-publish/route.ts`
+- `src/scripts/publish-content.ts`
+- `.github/workflows/publish-content.yml`
+- `docs/content_publish_https.md`
+
+生产环境必须设置 `CONTENT_PUBLISH_TOKEN`，GitHub workflow 使用同名 repository secret。日常内容发布不要使用 SSH、SCP、Cloud Assistant，也不要让服务器下载外部图片。
+
 ## 无 SSH 发布路径（R2 manifest pull）
 
 为了解决 SSH 经常不可用的问题，默认发布链路是：
