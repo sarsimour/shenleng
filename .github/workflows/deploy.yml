@@ -1,18 +1,12 @@
-name: Deploy Shenleng Web (Light Artifact)
+name: Deploy Shenleng Web (R2 Pull Artifact)
 
 on:
   push:
     branches: ["master"]
   workflow_dispatch:
-    inputs:
-      candidate_only:
-        description: "Validate the uploaded artifact on the candidate port without switching live traffic"
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
-  group: shenleng-web-production
+  group: shenleng-web-r2-artifact
   cancel-in-progress: false
 
 permissions:
@@ -22,7 +16,7 @@ env:
   ARTIFACT_NAME: shenleng-web-standalone.tgz
 
 jobs:
-  build-and-deploy-light:
+  build-and-publish-r2:
     runs-on: ubuntu-latest
 
     steps:
@@ -84,144 +78,26 @@ jobs:
           ls -lh "$ARTIFACT_NAME"
           echo "artifact_size=$(du -h "$ARTIFACT_NAME" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Configure SSH
+      - name: Publish artifact manifest to Cloudflare R2
         env:
-          ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_R2_BUCKET_NAME: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+          CLOUDFLARE_R2_PREFIX: ${{ secrets.CLOUDFLARE_R2_PREFIX || 'shenleng/web' }}
+          CLOUDFLARE_R2_PUBLIC_BASE_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_BASE_URL }}
         run: |
           set -euo pipefail
 
-          : "${ECS_SSH_KEY:?ECS_SSH_KEY is required}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}"
+          : "${CLOUDFLARE_R2_BUCKET_NAME:?CLOUDFLARE_R2_BUCKET_NAME is required}"
+          : "${CLOUDFLARE_R2_PUBLIC_BASE_URL:?CLOUDFLARE_R2_PUBLIC_BASE_URL is required}"
 
-          mkdir -p ~/.ssh
-          printf '%s\n' "$ECS_SSH_KEY" > ~/.ssh/shenleng-ecs
-          chmod 600 ~/.ssh/shenleng-ecs
+          python scripts/publish-r2-artifact.py --artifact "$ARTIFACT_NAME" > r2-publish-result.json
+          cat r2-publish-result.json
 
-      - name: Upload artifact and light deploy script
-        env:
-          ECS_HOST: ${{ secrets.ECS_HOST }}
-          ECS_USER: ${{ secrets.ECS_USER }}
-        run: |
-          set -euo pipefail
-
-          : "${ECS_HOST:?ECS_HOST is required}"
-          : "${ECS_USER:?ECS_USER is required}"
-
-          sha_short="${GITHUB_SHA:0:12}"
-          project_dir="/home/$ECS_USER/Projects/shenleng"
-          remote_dir="$project_dir/artifact-uploads/${GITHUB_RUN_ID}-${sha_short}"
-
-          ssh_opts=(
-            -i ~/.ssh/shenleng-ecs
-            -o BatchMode=yes
-            -o ConnectTimeout=30
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
-            -o StrictHostKeyChecking=no
-            -o UserKnownHostsFile=/dev/null
-          )
-
-          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
-            "mkdir -p '$remote_dir' '$project_dir/scripts' '$project_dir/artifact-uploads'"
-
-          /usr/bin/time -v timeout 8m scp -O "${ssh_opts[@]}" \
-            "$ARTIFACT_NAME" \
-            scripts/deploy-web-light.sh \
-            "$ECS_USER@$ECS_HOST:$remote_dir/"
-
-          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
-            "cp '$remote_dir/deploy-web-light.sh' '$project_dir/scripts/deploy-web-light.sh' && chmod +x '$project_dir/scripts/deploy-web-light.sh' && ls -lh '$remote_dir/$ARTIFACT_NAME'"
-
-      - name: Write runtime environment on ECS
-        env:
-          ECS_HOST: ${{ secrets.ECS_HOST }}
-          ECS_USER: ${{ secrets.ECS_USER }}
-          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-          VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
-          NEXT_PUBLIC_VERSECORE_APP_ID: ${{ secrets.NEXT_PUBLIC_VERSECORE_APP_ID }}
-          NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME }}
-          NEXT_PUBLIC_LOGISTICS_CHATBOT_ID: ${{ secrets.NEXT_PUBLIC_LOGISTICS_CHATBOT_ID }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-          REQUEST_LOG_SHARED_SECRET: ${{ secrets.REQUEST_LOG_SHARED_SECRET }}
-        run: |
-          set -euo pipefail
-
-          : "${ECS_HOST:?ECS_HOST is required}"
-          : "${ECS_USER:?ECS_USER is required}"
-          : "${PAYLOAD_SECRET:?PAYLOAD_SECRET is required}"
-          : "${NEXT_PUBLIC_LOGISTICS_CHATBOT_ID:?NEXT_PUBLIC_LOGISTICS_CHATBOT_ID is required}"
-          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
-
-          if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
-            VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
-          fi
-          if [ -z "${NEXT_PUBLIC_VERSECORE_APP_ID:-}" ]; then
-            NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"
-          fi
-          if [ -z "${NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME:-}" ]; then
-            NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME="申冷售前顾问"
-          fi
-
-          umask 077
           {
-            printf 'PAYLOAD_SECRET=%s\n' "$PAYLOAD_SECRET"
-            printf 'VERSECORE_API_BASE_URL=%s\n' "$VERSECORE_API_BASE_URL"
-            printf 'NEXT_PUBLIC_VERSECORE_APP_ID=%s\n' "$NEXT_PUBLIC_VERSECORE_APP_ID"
-            printf 'NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME=%s\n' "$NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME"
-            printf 'NEXT_PUBLIC_LOGISTICS_CHATBOT_ID=%s\n' "$NEXT_PUBLIC_LOGISTICS_CHATBOT_ID"
-            printf 'NEXT_PUBLIC_SITE_URL=%s\n' "$NEXT_PUBLIC_SITE_URL"
-            printf 'REQUEST_LOG_SHARED_SECRET=%s\n' "$REQUEST_LOG_SHARED_SECRET"
-          } > runtime.env
-
-          ssh_opts=(
-            -i ~/.ssh/shenleng-ecs
-            -o BatchMode=yes
-            -o ConnectTimeout=30
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
-            -o StrictHostKeyChecking=no
-            -o UserKnownHostsFile=/dev/null
-          )
-
-          project_dir="/home/$ECS_USER/Projects/shenleng"
-          scp -O "${ssh_opts[@]}" runtime.env "$ECS_USER@$ECS_HOST:$project_dir/.env.tmp"
-          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
-            "chmod 600 '$project_dir/.env.tmp' && mv '$project_dir/.env.tmp' '$project_dir/.env'"
-
-      - name: Run light deploy on ECS
-        env:
-          ECS_HOST: ${{ secrets.ECS_HOST }}
-          ECS_USER: ${{ secrets.ECS_USER }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-          VERSECORE_API_BASE_URL: ${{ secrets.VERSECORE_API_BASE_URL }}
-        run: |
-          set -euo pipefail
-
-          : "${ECS_HOST:?ECS_HOST is required}"
-          : "${ECS_USER:?ECS_USER is required}"
-          : "${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}"
-
-          if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
-            VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
-          fi
-
-          deploy_mode="--yes"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.candidate_only }}" = "true" ]; then
-            deploy_mode="--candidate-only"
-          fi
-
-          sha_short="${GITHUB_SHA:0:12}"
-          project_dir="/home/$ECS_USER/Projects/shenleng"
-          artifact_path="$project_dir/artifact-uploads/${GITHUB_RUN_ID}-${sha_short}/$ARTIFACT_NAME"
-
-          ssh_opts=(
-            -i ~/.ssh/shenleng-ecs
-            -o BatchMode=yes
-            -o ConnectTimeout=30
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
-            -o StrictHostKeyChecking=no
-            -o UserKnownHostsFile=/dev/null
-          )
-
-          ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" \
-            "cd '$project_dir' && PROJECT_DIR='$project_dir' PUBLIC_URL='$NEXT_PUBLIC_SITE_URL' WEB_DEPLOY_VERSECORE_API_BASE_URL='$VERSECORE_API_BASE_URL' scripts/deploy-web-light.sh --artifact '$artifact_path' $deploy_mode"
+            echo "### R2 artifact"
+            echo
+            jq -r '"- version: `\(.version)`", "- manifest: \(.manifestUrl)", "- artifact size: \(.size) bytes"' r2-publish-result.json
+          } >> "$GITHUB_STEP_SUMMARY"

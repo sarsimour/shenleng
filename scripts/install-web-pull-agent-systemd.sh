@@ -57,7 +57,11 @@ done
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 sudo install -d -m 0755 "$project_dir/scripts"
-sudo install -m 0755 "$repo_dir/scripts/deploy-web-pull-agent.sh" "$project_dir/scripts/deploy-web-pull-agent.sh"
+if [ "$(realpath "$repo_dir/scripts/deploy-web-pull-agent.sh")" != "$(realpath -m "$project_dir/scripts/deploy-web-pull-agent.sh")" ]; then
+  sudo install -m 0755 "$repo_dir/scripts/deploy-web-pull-agent.sh" "$project_dir/scripts/deploy-web-pull-agent.sh"
+else
+  chmod 0755 "$project_dir/scripts/deploy-web-pull-agent.sh"
+fi
 
 cat >"$project_dir/.deploy-pull.env.tmp" <<ENV
 WEB_DEPLOY_MANIFEST_URL=$manifest_url

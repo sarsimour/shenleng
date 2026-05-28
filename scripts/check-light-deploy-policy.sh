@@ -9,9 +9,9 @@ if [ ! -f "$workflow" ]; then
 fi
 
 required_patterns=(
-  "scripts/deploy-web-light.sh"
-  "--yes"
-  "--candidate-only"
+  "scripts/publish-r2-artifact.py"
+  "CLOUDFLARE_R2_BUCKET_NAME"
+  "CLOUDFLARE_R2_PUBLIC_BASE_URL"
 )
 
 for pattern in "${required_patterns[@]}"; do
@@ -32,6 +32,11 @@ forbidden_patterns=(
   "docker container prune"
   "docker restart"
   "docker rm"
+  "scp "
+  "ssh "
+  "ECS_HOST"
+  "ECS_SSH_KEY"
+  "ECS_USER"
   "reboot"
   "shutdown"
 )

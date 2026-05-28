@@ -2,13 +2,13 @@
 
 测试期线上域名为 `https://shenleng.roinland.com`，正式上线域名切换时必须同步更新 `NEXT_PUBLIC_SITE_URL` 并重新构建。
 
-默认前端发布入口是 `.github/workflows/deploy.yml`，它只走轻量 artifact 发布：GitHub Runner 构建，ECS 只接收 artifact、启动候选版本、健康检查、切换或回滚。
+默认前端发布入口是 `.github/workflows/deploy.yml`，它走 Cloudflare R2 manifest pull：GitHub Runner 构建 standalone artifact 并上传 R2，ECS 上的 pull-agent 每 2 分钟检查 manifest，有新版本才下载、校验、启动候选版本、健康检查、切换或回滚。
 
-`scripts/check-light-deploy-policy.sh` 会在默认发布 workflow 开始时检查 `.github/workflows/deploy.yml`，如果重新混入 `docker/build-push-action`、`docker compose up`、`docker pull`、Docker prune、`reboot` 等生产重操作，workflow 会直接失败。
+`scripts/check-light-deploy-policy.sh` 会在默认发布 workflow 开始时检查 `.github/workflows/deploy.yml`，如果重新混入 `docker/build-push-action`、`docker compose up`、`docker pull`、Docker prune、SSH/SCP、`reboot` 等生产重操作，workflow 会直接失败。
 
 ## 前端轻量发布（推荐日常路径）
 
-日常前端更新不要在 ECS 上构建，也不要重启 ECS。推荐流程是：在本地或 CI 构建 Next.js standalone artifact，上传到服务器后用 `scripts/deploy-web-light.sh` 在候选端口验证，通过后再切到线上端口。
+日常前端更新不要在 ECS 上构建，也不要重启 ECS。推荐流程是：GitHub Actions 构建 Next.js standalone artifact，上传到 R2 并更新 `manifest.json`；ECS pull-agent 自动下载新 artifact 后用 `scripts/deploy-web-light.sh` 在候选端口验证，通过后再切到线上端口。
 
 运行层由 `shenleng-web.service` 托管，前端会在 ECS 重启后自动恢复；`shenleng-web-watchdog.timer` 每分钟做轻量健康检查，只重启异常的前端、tunnel、云助手或 SSH 服务，不重启 ECS。迁移和恢复步骤见 `docs/server_runtime_recovery.md`。
 
@@ -75,21 +75,21 @@ WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
 
 ## GitHub Actions 入口
 
-- 自动发布：push 到 `master` 触发 `.github/workflows/deploy.yml`，构建 artifact 后执行 `scripts/deploy-web-light.sh --yes`
+- 自动发布：push 到 `master` 触发 `.github/workflows/deploy.yml`，构建 artifact 后上传到 R2，并更新 `shenleng/web/manifest.json`
+- ECS 自动拉取：`shenleng-web-pull-agent.timer` 每 2 分钟读取 manifest，发现新版本后下载、校验 sha256，并执行 `scripts/deploy-web-light.sh --yes`
 - 手动候选验证：运行 `.github/workflows/deploy-artifact-candidate.yml`，构建 artifact 后执行 `scripts/deploy-web-light.sh --candidate-only`
-- 手动只验证不切流量：运行 `.github/workflows/deploy.yml`，勾选 `candidate_only`
 
-这两个 workflow 都复用同一个远端脚本，避免出现两套不同的部署逻辑。
+日常发布不再需要 SSH。SSH/SCP 只保留给一次性安装 pull-agent、极端恢复、候选验证等人工维护场景。
 
-当前 GitHub Actions 上传 artifact 和执行远端脚本仍依赖 SSH/SCP。它已经避免了 ECS 构建、镜像拉取和服务器重启，但还不是最终的“无 SSH 发布”。如果要彻底去掉 SSH，需要改为 GitHub 上传 OSS artifact 和 manifest，ECS 上的 pull agent 定时拉取并调用 `deploy-web-light.sh`。
+默认 workflow 不把运行时 `.env` 写入 ECS。运行时环境由服务器上的 `/home/ecs-user/Projects/shenleng/.env` 管理；只有 `NEXT_PUBLIC_*` 这类构建期公开变量来自 GitHub Secrets 并写入 artifact。
 
-## 无 SSH 发布试验路径（OSS manifest pull）
+## 无 SSH 发布路径（R2 manifest pull）
 
-为了解决 SSH 经常不可用的问题，新增一条手动试验链路：
+为了解决 SSH 经常不可用的问题，默认发布链路是：
 
 ```text
 GitHub Actions 构建 standalone artifact
-  -> 上传到 OSS
+  -> 上传到 Cloudflare R2
   -> 写 manifest.json
   -> ECS pull agent 定时读取 manifest
   -> 下载 artifact
@@ -99,8 +99,8 @@ GitHub Actions 构建 standalone artifact
 
 相关文件：
 
-- `.github/workflows/deploy-oss-artifact.yml`
-- `scripts/publish-oss-artifact.py`
+- `.github/workflows/deploy.yml`
+- `scripts/publish-r2-artifact.py`
 - `scripts/deploy-web-pull-agent.sh`
 - `scripts/install-web-pull-agent-systemd.sh`
 - `systemd/shenleng-web-pull-agent.service.template`
@@ -120,28 +120,30 @@ GitHub workflow 需要这些 Secrets：
 
 | Secret | 用途 |
 |---|---|
-| `ALIYUN_ACCESS_KEY_ID` | 上传 OSS 的 RAM AccessKey |
-| `ALIYUN_ACCESS_KEY_SECRET` | 上传 OSS 的 RAM Secret |
-| `ALIYUN_OSS_BUCKET` | OSS bucket 名称 |
-| `ALIYUN_OSS_ENDPOINT` | OSS endpoint，例如 `https://oss-cn-shanghai.aliyuncs.com` |
-| `ALIYUN_OSS_PREFIX` | 可选，默认 `shenleng/web` |
-| `ALIYUN_OSS_PUBLIC_BASE_URL` | 可选，manifest 中生成的公开访问前缀 |
-| `ALIYUN_OSS_OBJECT_ACL` | 可选，`public-read` 或 `private` |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
+| `CLOUDFLARE_API_TOKEN` | 允许写入 R2 object 的 API token |
+| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket 名称，当前使用 `sv-bucket` |
+| `CLOUDFLARE_R2_PUBLIC_BASE_URL` | R2 公共读取根 URL |
+| `CLOUDFLARE_R2_PREFIX` | 可选，默认 `shenleng/web` |
+| `NEXT_PUBLIC_SITE_URL` | 必填，构建期公开站点 URL |
+| `NEXT_PUBLIC_LOGISTICS_CHATBOT_ID` | 必填，构建期公开 chatbot id |
 
-ECS 安装 pull agent 示例：
+ECS 安装 pull-agent 示例：
 
 ```bash
 cd /home/ecs-user/Projects/shenleng
 
 scripts/install-web-pull-agent-systemd.sh \
   --project-dir /home/ecs-user/Projects/shenleng \
-  --manifest-url https://<bucket>.<endpoint>/shenleng/web/manifest.json \
+  --manifest-url https://<r2-public-domain>/shenleng/web/manifest.json \
   --public-url https://shenleng.roinland.com
 ```
 
-安装后日常发布不再需要 SSH。GitHub 只需要更新 OSS 上的 `manifest.json`；ECS 每 2 分钟检查一次，有新版本就拉取并部署。
+安装后日常发布不再需要 SSH。GitHub 只需要更新 R2 上的 `manifest.json`；ECS 每 2 分钟检查一次，有新版本就拉取并部署。
 
 注意：第一次安装 pull agent 仍需要一次控制通道。可以是 SSH、云助手、Workbench 或迁移镜像预装。安装后，日常前端发布可以不依赖 SSH。
+
+`.github/workflows/deploy-oss-artifact.yml` 和 `scripts/publish-oss-artifact.py` 仍保留为阿里云 OSS 备选路径；当前默认路径不用它们。
 
 ## 旧镜像架构（仅运行环境变化时参考）
 
@@ -169,6 +171,8 @@ GitHub Actions Runner（7GB RAM, AMD64）
 - 默认流水线：`.github/workflows/deploy.yml`
 - 手动候选验证：`.github/workflows/deploy-artifact-candidate.yml`
 - 远端轻量发布脚本：`scripts/deploy-web-light.sh`
+- R2 上传脚本：`scripts/publish-r2-artifact.py`
+- ECS pull-agent：`scripts/deploy-web-pull-agent.sh`
 - 默认 workflow policy：`scripts/check-light-deploy-policy.sh`
 - 旧镜像编排：`docker-compose.yml`（仅运行环境变化时参考）
 - 旧镜像构建：`Dockerfile`（仅运行环境变化时参考）
@@ -177,13 +181,14 @@ GitHub Actions Runner（7GB RAM, AMD64）
 
 | Secret | 用途 |
 |---|---|
-| `ECS_HOST` / `ECS_USER` / `ECS_SSH_KEY` | SSH 到 ECS 的凭据 |
-| `PAYLOAD_SECRET` | Payload CMS 加密 secret |
-| `VERSECORE_API_BASE_URL` | 可选，默认 `http://127.0.0.1:9000`（宿主机前端进程访问后端） |
+| `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` | 上传 R2 artifact 和 manifest |
+| `CLOUDFLARE_R2_BUCKET_NAME` / `CLOUDFLARE_R2_PUBLIC_BASE_URL` | R2 artifact 存储和公开读取 |
 | `NEXT_PUBLIC_SITE_URL` | 必填，公开站点根 URL；canonical、sitemap、robots、JSON-LD 都从这里生成 |
 | `NEXT_PUBLIC_LOGISTICS_CHATBOT_ID` | 必填，Next.js 构建时写入客户端的固定 VerseCore chatbot UUID |
 | `NEXT_PUBLIC_VERSECORE_APP_ID` | 可选，默认 `logistics-web` |
 | `NEXT_PUBLIC_LOGISTICS_CHATBOT_NAME` | 可选，默认 `申冷售前顾问` |
+| `ECS_HOST` / `ECS_USER` / `ECS_SSH_KEY` | 仅人工维护或候选验证需要，不在默认发布 workflow 使用 |
+| `PAYLOAD_SECRET` / `VERSECORE_API_BASE_URL` | 运行时在 ECS `.env` 中管理，默认发布 workflow 不写入 |
 | `REQUEST_LOG_SHARED_SECRET` | 可选，服务端访问日志接口共享密钥；未配置时接口仍可写入，但有基础频率限制 |
 | `BAIDU_PUSH_ENDPOINT` / `BAIDU_SITE` / `BAIDU_TOKEN` | 可选，百度搜索资源平台普通收录提交脚本使用 |
 | `ANALYTICS_REPORT_TO` / `ANALYTICS_WEBHOOK_URL` | 可选，营销分析日报推送 |
@@ -191,18 +196,21 @@ GitHub Actions Runner（7GB RAM, AMD64）
 ## 触发方式
 
 - 自动：push 到 `master`
-- 手动发布或候选验证：GitHub Actions → Deploy Shenleng Web (Light Artifact) → Run workflow
+- 手动发布：GitHub Actions → Deploy Shenleng Web (R2 Pull Artifact) → Run workflow
+- 手动候选验证：GitHub Actions → Deploy Artifact Candidate → Run workflow
 
 ## 时间预期
 
 - GitHub Runner 冷缓存构建：通常数分钟，资源消耗发生在 GitHub Runner，不发生在 ECS
-- ECS 侧上传、候选启动、健康检查、切换：通常秒级到 1-2 分钟，取决于 artifact 大小和网络
+- ECS 侧发现 manifest、下载、候选启动、健康检查、切换：通常 2-4 分钟，取决于 pull-agent timer、artifact 大小和网络
 - ECS 不执行镜像 build，不拉大镜像，不重启机器
 
 ## 镜像产物
 
 - 轻量发布产物：`shenleng-web-standalone.tgz`
-- 服务器上传目录：`/home/ecs-user/Projects/shenleng/artifact-uploads/<run-id>-<sha>/`
+- R2 manifest：`shenleng/web/manifest.json`
+- R2 artifact：`shenleng/web/artifacts/<run-id>-<sha>/shenleng-web-standalone.tgz`
+- 服务器下载目录：`/home/ecs-user/Projects/shenleng/artifact-uploads/pull-agent/<version>/`
 - 服务器 release 目录：`/home/ecs-user/Projects/shenleng/releases/web-<timestamp>-<sha>/`
 - 旧镜像仓库（仅运行环境变化时参考）：`crpi-magb6k3sv0c9s8ci.cn-shanghai.personal.cr.aliyuncs.com/sl-2026/slgw`
 - Tag：`latest`（每次部署覆盖；想留版本快照请新增 tag）
@@ -211,7 +219,8 @@ GitHub Actions Runner（7GB RAM, AMD64）
 
 - 项目目录：`/home/ecs-user/Projects/shenleng/`
 - 持久化卷：`./persistence/sqlite`、`./persistence/media`（不在镜像里，不会被覆盖）
-- `.env` 由 workflow 写入，包含 `PAYLOAD_SECRET`、`VERSECORE_API_BASE_URL` 和 AI 助手公开配置
+- `.env` 在服务器上持久化管理，包含 `PAYLOAD_SECRET`、`VERSECORE_API_BASE_URL` 和 AI 助手配置；默认发布 workflow 不覆盖它
+- `.deploy-pull.env` 保存 pull-agent 的 manifest URL、项目目录和公开 URL
 - 当前测试期 `NEXT_PUBLIC_SITE_URL` 应为 `https://shenleng.roinland.com`。正式域名启用前不要在代码里硬编码新旧域名，只改 GitHub Secret 后重新部署；生产中非规范 Host 的 GET/HEAD 请求会自动跳到该 URL。
 
 ## 磁盘维护

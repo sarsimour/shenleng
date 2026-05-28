@@ -12,6 +12,8 @@
 /etc/systemd/system/shenleng-web-watchdog.timer
 /home/ecs-user/Projects/shenleng/scripts/shenleng-web-watchdog.sh
 /home/ecs-user/Projects/shenleng/scripts/deploy-web-light.sh
+/home/ecs-user/Projects/shenleng/scripts/deploy-web-pull-agent.sh
+/home/ecs-user/Projects/shenleng/.deploy-pull.env
 /home/ecs-user/Projects/shenleng/current-web
 /home/ecs-user/Projects/shenleng/state/web-deploy/current-release
 ```
@@ -28,6 +30,7 @@
 ```text
 shenleng-web.service
 shenleng-web-watchdog.timer
+shenleng-web-pull-agent.timer
 ssh.service
 cloudflared.service
 aliyun.service
@@ -94,6 +97,16 @@ watchdog 不会执行以下操作：
 - 不拉取或清理 Docker 镜像。
 - 不修改数据库。
 
+`shenleng-web-pull-agent.timer` 每 2 分钟运行一次 `deploy-web-pull-agent.sh`。它只做发布拉取：
+
+- 读取 R2 上的 `manifest.json`。
+- 如果版本已经应用，直接退出。
+- 下载 artifact 到 `artifact-uploads/pull-agent/`。
+- 校验 sha256。
+- 调用 `deploy-web-light.sh` 进行候选验证、切换和回滚。
+
+pull-agent 不依赖 SSH，不在 ECS 上构建，不安装依赖，不拉 Docker 镜像，不重启 ECS。
+
 ## 从零迁移复现
 
 迁移到一台新 ECS 时，先准备基础环境：
@@ -105,6 +118,7 @@ watchdog 不会执行以下操作：
 5. 恢复 `persistence/media/` 和 `persistence/images/`。
 6. 放置一个已经构建好的 Next.js standalone release 到 `releases/`。
 7. 创建 `current-web` 软链接，指向这个 release。
+8. 安装 pull-agent，指向 R2 manifest。
 
 示例：
 
@@ -143,6 +157,15 @@ sudo systemctl restart shenleng-web.service
 sudo systemctl start shenleng-web-watchdog.timer
 ```
 
+安装 pull-agent：
+
+```bash
+scripts/install-web-pull-agent-systemd.sh \
+  --project-dir /home/ecs-user/Projects/shenleng \
+  --manifest-url https://<r2-public-domain>/shenleng/web/manifest.json \
+  --public-url https://shenleng.roinland.com
+```
+
 ## 迁移后验证
 
 本机验证：
@@ -150,6 +173,7 @@ sudo systemctl start shenleng-web-watchdog.timer
 ```bash
 systemctl is-active shenleng-web.service
 systemctl is-active shenleng-web-watchdog.timer
+systemctl is-active shenleng-web-pull-agent.timer
 systemctl is-active cloudflared.service
 systemctl is-active aliyun.service
 curl -fsS http://127.0.0.1:3000/ >/dev/null
@@ -191,53 +215,31 @@ sudo systemctl restart ssh.service
 ```bash
 journalctl -u shenleng-web.service -n 100 --no-pager
 journalctl -u shenleng-web-watchdog.service -n 100 --no-pager
+journalctl -u shenleng-web-pull-agent.service -n 100 --no-pager
 journalctl -u cloudflared.service -n 100 --no-pager
 journalctl -u aliyun.service -n 100 --no-pager
 ```
 
 ## 当前边界
 
-当前运行层已经满足“轻量、尽量不重启服务器、服务异常自动恢复”的目标。
-
-但当前 GitHub Actions 代码发布仍然通过 SSH/SCP 上传 artifact 并执行 `deploy-web-light.sh`。这比镜像发布轻很多，但还没有完全摆脱 SSH。
-
-另外，当前生产服务器已经出现过 `ssh.service` active 但公网 SSH banner 超时的半死状态。仓库内 watchdog 已加入本机 SSH banner 探测；如果生产服务器再次可控，需要重新运行安装脚本或同步 `scripts/shenleng-web-watchdog.sh` 到服务器。
-
-下一步如果要让发布也不依赖 SSH，需要实现：
+当前运行层已经满足“轻量、尽量不重启服务器、服务异常自动恢复”的目标。默认代码发布也已经改为无 SSH 的 manifest pull：
 
 ```text
 GitHub Runner 构建 artifact
--> 上传 OSS
+-> 上传 R2
 -> 写 manifest.json
 -> ECS 本机 pull agent 定时检查 manifest
 -> 下载并校验 sha256
 -> 调用 deploy-web-light.sh 候选验证和切换
 ```
 
-仓库已经提供试验实现：
+核心文件：
 
 ```text
-.github/workflows/deploy-oss-artifact.yml
-scripts/publish-oss-artifact.py
+.github/workflows/deploy.yml
+scripts/publish-r2-artifact.py
 scripts/deploy-web-pull-agent.sh
 scripts/install-web-pull-agent-systemd.sh
 systemd/shenleng-web-pull-agent.service.template
 systemd/shenleng-web-pull-agent.timer
 ```
-
-安装到 ECS：
-
-```bash
-scripts/install-web-pull-agent-systemd.sh \
-  --project-dir /home/ecs-user/Projects/shenleng \
-  --manifest-url https://<bucket>.<endpoint>/shenleng/web/manifest.json \
-  --public-url https://shenleng.roinland.com
-```
-
-安装后会启用：
-
-```text
-shenleng-web-pull-agent.timer
-```
-
-它每 2 分钟读取一次 manifest。发现新版本后下载 artifact、校验 sha256，并调用 `deploy-web-light.sh`。这个过程不依赖 SSH，不在 ECS 上构建，也不重启服务器。
