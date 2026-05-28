@@ -87,14 +87,78 @@ free_disk_mb() {
 
 find_port_pids() {
   local port="$1"
+  local pids=""
+
   if command -v lsof >/dev/null 2>&1; then
-    lsof -ti "tcp:$port" 2>/dev/null || true
-    return
+    pids="$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+    if [ -n "$pids" ]; then
+      printf '%s\n' "$pids" | sort -u
+      return
+    fi
   fi
 
-  ss -ltnp "sport = :$port" 2>/dev/null \
-    | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' \
-    | sort -u || true
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :$port" 2>/dev/null \
+      | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' \
+      | sort -u || true
+  fi
+}
+
+pid_is_listening_on_port() {
+  local pid="$1"
+  local port="$2"
+  local listener
+
+  for listener in $(find_port_pids "$port"); do
+    if [ "$listener" = "$pid" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+release_is_listening_on_port() {
+  local release_dir="$1"
+  local port="$2"
+  local listener
+  local listener_cwd
+
+  for listener in $(find_port_pids "$port"); do
+    listener_cwd="$(readlink -f "/proc/$listener/cwd" 2>/dev/null || true)"
+    if [ "$listener_cwd" = "$release_dir" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+systemctl_run() {
+  if [ "$(id -u)" -eq 0 ]; then
+    systemctl "$@"
+  else
+    sudo -n systemctl "$@"
+  fi
+}
+
+can_manage_systemd_unit() {
+  local unit="$1"
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl status "$unit" >/dev/null 2>&1 || systemctl list-unit-files "$unit" >/dev/null 2>&1 || return 1
+
+  if [ "$(id -u)" -eq 0 ]; then
+    return 0
+  fi
+
+  sudo -n true >/dev/null 2>&1
+}
+
+update_current_symlink() {
+  local target="$1"
+  local link="$PROJECT_DIR/current-web"
+
+  ln -sfnT "$target" "$link" 2>/dev/null || ln -sfn "$target" "$link"
 }
 
 stop_pids() {
@@ -205,18 +269,25 @@ wait_for_ready() {
   local pid="$2"
   local log_file="$3"
   local timeout_seconds="$4"
+  local expected_release_dir="${5:-}"
   local started_at
   started_at="$(date +%s)"
 
   while true; do
-    if curl -fsS --max-time 5 "http://127.0.0.1:$port/" >/tmp/shenleng-web-health-home.html 2>/dev/null; then
-      return 0
-    fi
-
-    if ! kill -0 "$pid" 2>/dev/null; then
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
       tail -n 160 "$log_file" || true
       log "Process $pid exited before becoming ready on port $port."
       return 1
+    fi
+
+    if curl -fsS --max-time 5 "http://127.0.0.1:$port/" >/tmp/shenleng-web-health-home.html 2>/dev/null; then
+      if [ -n "$expected_release_dir" ] && release_is_listening_on_port "$expected_release_dir" "$port"; then
+        return 0
+      fi
+      if [ -z "$expected_release_dir" ] && [ -n "$pid" ] && pid_is_listening_on_port "$pid" "$port"; then
+        return 0
+      fi
+      log "Port $port responded, but expected release is not the listener yet."
     fi
 
     if [ $(( $(date +%s) - started_at )) -ge "$timeout_seconds" ]; then
@@ -478,9 +549,9 @@ log "Candidate database prepared."
 candidate_pid=""
 rollback_pid=""
 cleanup_candidate() {
-  if [ -n "${candidate_pid:-}" ] && kill -0 "$candidate_pid" 2>/dev/null; then
-    stop_pids "$candidate_pid" "$STOP_TIMEOUT_SECONDS"
-  fi
+  local candidate_cleanup_pids
+  candidate_cleanup_pids="$(printf '%s\n%s\n' "${candidate_pid:-}" "$(find_port_pids "$CANDIDATE_PORT")" | awk 'NF' | sort -u)"
+  stop_pids "$candidate_cleanup_pids" "$STOP_TIMEOUT_SECONDS"
 }
 trap cleanup_candidate EXIT
 
@@ -488,6 +559,7 @@ log "Starting candidate on 127.0.0.1:$CANDIDATE_PORT"
 candidate_pid="$(start_next_server "$release_dir" "$CANDIDATE_PORT" "127.0.0.1" "file:$candidate_db" "$candidate_log" "$candidate_pid_file")"
 log "candidate_pid=$candidate_pid"
 wait_for_ready "$CANDIDATE_PORT" "$candidate_pid" "$candidate_log" "$STARTUP_TIMEOUT_SECONDS" \
+  "$release_dir" \
   || die "Candidate did not become ready."
 check_local_http "$CANDIDATE_PORT" "candidate" \
   || die "Candidate HTTP validation failed."
@@ -522,14 +594,36 @@ else
   log "No active release detected on port $ACTIVE_PORT. This will be treated as an initial deploy."
 fi
 
-log "Promoting $release_id to live port $ACTIVE_PORT"
-stop_pids "$old_pids" "$STOP_TIMEOUT_SECONDS"
+SYSTEMD_WEB_SERVICE="${SYSTEMD_WEB_SERVICE:-shenleng-web.service}"
+use_systemd_live=0
+if can_manage_systemd_unit "$SYSTEMD_WEB_SERVICE"; then
+  use_systemd_live=1
+  log "Systemd live service detected: $SYSTEMD_WEB_SERVICE"
+fi
 
-new_live_pid="$(start_next_server "$release_dir" "$ACTIVE_PORT" "0.0.0.0" "file:$prod_db" "$live_log" "$live_pid_file")"
-log "live_pid=$new_live_pid"
+log "Promoting $release_id to live port $ACTIVE_PORT"
 
 set +e
-wait_for_ready "$ACTIVE_PORT" "$new_live_pid" "$live_log" "$STARTUP_TIMEOUT_SECONDS"
+if [ "$use_systemd_live" = "1" ]; then
+  systemctl_run stop "$SYSTEMD_WEB_SERVICE"
+  stop_pids "$(find_port_pids "$ACTIVE_PORT")" "$STOP_TIMEOUT_SECONDS"
+  update_current_symlink "$release_dir"
+  systemctl_run start "$SYSTEMD_WEB_SERVICE"
+  new_live_pid="$(systemctl show -p MainPID --value "$SYSTEMD_WEB_SERVICE" 2>/dev/null || true)"
+  log "systemd_live_pid=$new_live_pid"
+else
+  stop_pids "$old_pids" "$STOP_TIMEOUT_SECONDS"
+  remaining_active_pids="$(find_port_pids "$ACTIVE_PORT")"
+  if [ -n "$remaining_active_pids" ]; then
+    ps -fp $remaining_active_pids || true
+    die "Active port $ACTIVE_PORT is still occupied after stopping previous live process."
+  fi
+
+  new_live_pid="$(start_next_server "$release_dir" "$ACTIVE_PORT" "0.0.0.0" "file:$prod_db" "$live_log" "$live_pid_file")"
+  log "live_pid=$new_live_pid"
+fi
+
+wait_for_ready "$ACTIVE_PORT" "$new_live_pid" "$live_log" "$STARTUP_TIMEOUT_SECONDS" "$release_dir"
 ready_status=$?
 if [ "$ready_status" -eq 0 ]; then
   check_local_http "$ACTIVE_PORT" "live"
@@ -543,13 +637,25 @@ set -e
 
 if [ "$ready_status" -ne 0 ]; then
   log "Promotion failed. Rolling back."
-  stop_pids "$new_live_pid" "$STOP_TIMEOUT_SECONDS"
+  if [ "$use_systemd_live" = "1" ]; then
+    systemctl_run stop "$SYSTEMD_WEB_SERVICE"
+  else
+    stop_pids "$new_live_pid" "$STOP_TIMEOUT_SECONDS"
+  fi
+  stop_pids "$(find_port_pids "$ACTIVE_PORT")" "$STOP_TIMEOUT_SECONDS"
 
   if [ -n "$old_release" ] && [ -f "$old_release/server.js" ]; then
-    rollback_log="$LOG_DIR/rollback-$(date +%Y%m%d%H%M%S).log"
-    rollback_pid="$(start_next_server "$old_release" "$ACTIVE_PORT" "0.0.0.0" "file:$prod_db" "$rollback_log" "$live_pid_file")"
+    if [ "$use_systemd_live" = "1" ]; then
+      update_current_symlink "$old_release"
+      systemctl_run start "$SYSTEMD_WEB_SERVICE"
+      rollback_pid="$(systemctl show -p MainPID --value "$SYSTEMD_WEB_SERVICE" 2>/dev/null || true)"
+      rollback_log="$live_log"
+    else
+      rollback_log="$LOG_DIR/rollback-$(date +%Y%m%d%H%M%S).log"
+      rollback_pid="$(start_next_server "$old_release" "$ACTIVE_PORT" "0.0.0.0" "file:$prod_db" "$rollback_log" "$live_pid_file")"
+    fi
     log "rollback_pid=$rollback_pid"
-    wait_for_ready "$ACTIVE_PORT" "$rollback_pid" "$rollback_log" "$STARTUP_TIMEOUT_SECONDS" \
+    wait_for_ready "$ACTIVE_PORT" "$rollback_pid" "$rollback_log" "$STARTUP_TIMEOUT_SECONDS" "$old_release" \
       || die "Rollback process did not become ready."
     check_local_http "$ACTIVE_PORT" "rollback" \
       || die "Rollback HTTP validation failed."
@@ -559,9 +665,9 @@ if [ "$ready_status" -ne 0 ]; then
   exit 1
 fi
 
-ln -sfn "$release_dir" "$PROJECT_DIR/current-web"
+update_current_symlink "$release_dir"
 printf '%s\n' "$release_dir" >"$STATE_DIR/current-release"
-printf '%s\n' "$new_live_pid" >"$STATE_DIR/live.pid"
+find_port_pids "$ACTIVE_PORT" >"$STATE_DIR/live.pid"
 rm -f "$candidate_db"
 cleanup_candidate
 candidate_pid=""
