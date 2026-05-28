@@ -124,9 +124,9 @@ export default async function ArticlePage({ params }: Props) {
       <div className="mx-auto max-w-4xl px-6 lg:px-8 mt-12">
         <div className="w-full">
           {article.isLegacy ? (
-            // 渲染旧版 HTML
+            // 渲染迁移内容和轻量发布内容共用的文章 HTML
             <div 
-              className="legacy-article-content prose prose-lg prose-slate max-w-none 
+              className="article-html-content prose prose-lg prose-slate max-w-none 
                 prose-img:rounded-2xl prose-img:shadow-lg prose-table:border prose-table:border-slate-200"
               dangerouslySetInnerHTML={{ __html: article.legacyHtml || "" }}
             />
