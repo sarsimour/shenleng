@@ -122,7 +122,7 @@ GitHub workflow 需要这些 Secrets：
 |---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
 | `CLOUDFLARE_API_TOKEN` | 允许写入 R2 object 的 API token |
-| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket 名称，当前使用 `sv-bucket` |
+| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket 名称，当前使用 `shenleng-web-deploy` |
 | `CLOUDFLARE_R2_PUBLIC_BASE_URL` | R2 公共读取根 URL |
 | `CLOUDFLARE_R2_PREFIX` | 可选，默认 `shenleng/web` |
 | `NEXT_PUBLIC_SITE_URL` | 必填，构建期公开站点 URL |
