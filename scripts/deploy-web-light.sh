@@ -373,6 +373,27 @@ copy_sqlite_db() {
   fi
 }
 
+ensure_runtime_schema() {
+  local release_dir="$1"
+  local database_uri="$2"
+  local schema_script="$release_dir/src/scripts/ensure-runtime-schema.mjs"
+
+  if [ ! -f "$schema_script" ]; then
+    log "No runtime schema script found in release; skipping schema sync."
+    return 0
+  fi
+
+  log "Ensuring runtime schema for $database_uri"
+  (
+    cd "$release_dir"
+    env \
+      NODE_ENV=production \
+      DATABASE_URI="$database_uri" \
+      PAYLOAD_SECRET="$PAYLOAD_SECRET" \
+      node "$schema_script"
+  )
+}
+
 cleanup_old_releases() {
   local keep="$1"
 
@@ -545,6 +566,7 @@ log "Release ready: $release_dir"
 candidate_db="$release_dir/database/payload-candidate.db"
 copy_sqlite_db "$prod_db" "$candidate_db"
 log "Candidate database prepared."
+ensure_runtime_schema "$release_dir" "file:$candidate_db"
 
 candidate_pid=""
 rollback_pid=""
@@ -600,6 +622,8 @@ if can_manage_systemd_unit "$SYSTEMD_WEB_SERVICE"; then
   use_systemd_live=1
   log "Systemd live service detected: $SYSTEMD_WEB_SERVICE"
 fi
+
+ensure_runtime_schema "$release_dir" "file:$prod_db"
 
 log "Promoting $release_id to live port $ACTIVE_PORT"
 

@@ -98,7 +98,7 @@ function scheduleRequestLog(
     requestId: req.headers.get("cf-ray") || req.headers.get("x-request-id") || "",
   });
 
-  const endpoint = new URL("/api/track/request-log", req.nextUrl.origin);
+  const endpoint = getRequestLogEndpoint();
   event.waitUntil(
     fetch(endpoint, {
       method: "POST",
@@ -109,6 +109,14 @@ function scheduleRequestLog(
       console.error("Request log dispatch failed:", error);
     }),
   );
+}
+
+function getRequestLogEndpoint(): URL {
+  const configured = process.env.REQUEST_LOG_ENDPOINT?.trim();
+  if (configured) return new URL(configured);
+
+  const port = process.env.PORT?.trim() || "3000";
+  return new URL("/api/track/request-log", `http://127.0.0.1:${port}`);
 }
 
 export const config = {
