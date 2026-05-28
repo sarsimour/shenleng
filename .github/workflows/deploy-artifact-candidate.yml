@@ -146,7 +146,7 @@ jobs:
             UPLOAD_DIR="$PROJECT_DIR/artifact-uploads/$RUN_ID"
 
             if [ -z "${VERSECORE_API_BASE_URL:-}" ]; then
-              VERSECORE_API_BASE_URL="http://127.0.0.1:9000"
+              VERSECORE_API_BASE_URL="http://127.0.0.1:9100"
             fi
             if [ -z "${NEXT_PUBLIC_VERSECORE_APP_ID:-}" ]; then
               NEXT_PUBLIC_VERSECORE_APP_ID="logistics-web"

@@ -52,7 +52,7 @@ function resolveBackendBaseURL(): string[] {
   if (configured) return [configured];
 
   if (process.env.NODE_ENV === "production") {
-    return ["http://versecore-api:9000"];
+    return ["http://127.0.0.1:9100"];
   }
 
   // Dev fallback candidates:

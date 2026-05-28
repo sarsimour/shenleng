@@ -28,7 +28,7 @@ Environment overrides:
   MAX_LOAD_1M=2.5
   STARTUP_TIMEOUT_SECONDS=90
   KEEP_RELEASES=5
-  WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9000
+  WEB_DEPLOY_VERSECORE_API_BASE_URL=http://127.0.0.1:9100
 EOF
 }
 
@@ -222,10 +222,10 @@ safe_source_env() {
 }
 
 normalize_backend_url() {
-  local configured="${WEB_DEPLOY_VERSECORE_API_BASE_URL:-${VERSECORE_API_BASE_URL:-http://127.0.0.1:9000}}"
+  local configured="${WEB_DEPLOY_VERSECORE_API_BASE_URL:-${VERSECORE_API_BASE_URL:-http://127.0.0.1:9100}}"
   case "$configured" in
     http://versecore-api:9000|http://versecore-api:9000/)
-      printf '%s\n' "http://127.0.0.1:9000"
+      printf '%s\n' "http://127.0.0.1:9100"
       ;;
     *)
       printf '%s\n' "$configured"

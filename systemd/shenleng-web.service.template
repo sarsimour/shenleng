@@ -15,7 +15,7 @@ Environment=PORT=3000
 Environment=HOSTNAME=0.0.0.0
 Environment=DATABASE_URI=file:{{PROJECT_DIR}}/persistence/sqlite/payload.db
 Environment=PAYLOAD_CONFIG_PATH=src/payload.config.ts
-Environment=VERSECORE_API_BASE_URL=http://127.0.0.1:9000
+Environment=VERSECORE_API_BASE_URL=http://127.0.0.1:9100
 ExecStart={{NODE_BIN}} server.js
 Restart=on-failure
 RestartSec=5s
