@@ -247,7 +247,12 @@ export function ChatWindow() {
         <div className="font-bold text-lg flex items-center gap-2">
            {chatbot ? chatbot.name : "在线客服"}
         </div>
-        <button onClick={closeChat} className="hover:bg-white/20 rounded-full p-1 transition">
+        <button
+          type="button"
+          onClick={closeChat}
+          className="hover:bg-white/20 rounded-full p-1 transition"
+          aria-label="关闭聊天"
+        >
           <X size={20} />
         </button>
       </div>
@@ -299,17 +304,19 @@ export function ChatWindow() {
       <div className="p-4 bg-white border-t border-gray-100 shrink-0">
         <div className="flex gap-2">
           <input
-            className="flex-1 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-deep/50 text-sm"
+            className="min-w-0 flex-1 bg-gray-100 rounded-full px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-deep/50"
             placeholder={chatbot ? "输入您的问题..." : "AI 客服连接中，您也可以直接拨打电话"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={!chatbot || (isLoading && messages[messages.length -1]?.role === 'user')} 
+            disabled={!chatbot || (isLoading && messages[messages.length - 1]?.role === "user")}
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!input.trim() || !chatbot || isLoading}
-            className="bg-brand-deep text-white p-2 rounded-full hover:bg-brand-deep/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="shrink-0 bg-brand-deep text-white p-2 rounded-full hover:bg-brand-deep/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            aria-label="发送消息"
           >
             <Send size={20} />
           </button>

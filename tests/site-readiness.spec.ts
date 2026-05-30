@@ -138,3 +138,59 @@ test("core pages have no horizontal overflow on 390px mobile viewport", async ({
     );
   }
 });
+
+test("chat window keeps mobile input controls reachable after focus", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.route("**/api/proxy/users/anonymous", async (route) => {
+    await route.fulfill({ json: { username: "readiness-chat-user" } });
+  });
+  await page.route("**/api/proxy/users/login", async (route) => {
+    await route.fulfill({ json: { access_token: "readiness-chat-token" } });
+  });
+  await page.route("**/api/proxy/chatbots/readiness-chatbot", async (route) => {
+    await route.fulfill({
+      json: {
+        chatbot: {
+          id: "readiness-chatbot",
+          name: "申冷售前顾问",
+          description: "Readiness chatbot",
+        },
+      },
+    });
+  });
+  await page.route("**/api/proxy/chatbots/readiness-chatbot/chat/start", async (route) => {
+    await route.fulfill({ json: { id: "readiness-session" } });
+  });
+  await page.route(
+    "**/api/proxy/chatbots/readiness-chatbot/chat/readiness-session/history?limit=50",
+    async (route) => {
+      await route.fulfill({ json: [] });
+    },
+  );
+
+  await page.goto(baseURL, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "在线咨询" }).click();
+
+  const input = page.getByPlaceholder("输入您的问题...");
+  await expect(input).toBeVisible();
+
+  const inputFontSize = await input.evaluate((element) =>
+    Number.parseFloat(window.getComputedStyle(element).fontSize),
+  );
+  expect(inputFontSize).toBeGreaterThanOrEqual(16);
+
+  await input.focus();
+
+  const dimensions = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.innerWidth);
+
+  const sendButton = page.getByRole("button", { name: "发送消息" });
+  await expect(sendButton).toBeInViewport();
+
+  const closeButton = page.getByRole("button", { name: "关闭聊天" });
+  await expect(closeButton).toBeInViewport();
+});
