@@ -131,9 +131,8 @@ export default async function ArticlePage({ params }: Props) {
               dangerouslySetInnerHTML={{ __html: article.legacyHtml || "" }}
             />
           ) : (
-            // 这里以后对接 Lexical 渲染器
             <div className="prose prose-lg prose-slate max-w-none">
-              <p>新文章内容待接入...</p>
+              <p>{article.summary || "感谢关注申冷物流。更多业务详情，欢迎联系申冷团队沟通。"}</p>
             </div>
           )}
           

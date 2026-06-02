@@ -87,8 +87,7 @@ export function ChatWindow() {
             ...prev,
             {
               role: "ai",
-              content:
-                "系统配置缺失：未设置 NEXT_PUBLIC_LOGISTICS_CHATBOT_ID，暂时无法连接 AI 客服。",
+              content: "AI 客服暂时无法连接，您可以直接拨打 021-38930219 获得即时支持。",
             },
           ]);
           return;

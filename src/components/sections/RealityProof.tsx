@@ -33,7 +33,7 @@ export default function RealityProof() {
               我们保留作业真实感，不做过度包装
             </h2>
             <p className="mt-4 text-slate-600 leading-7">
-              对货代团队来说，真实作业能力比视觉“精修”更重要。以下图片均来自一线执行场景，用于展示我们的日常作业状态。
+              对货代团队来说，真实作业能力比视觉“精修”更重要。我们记录一线作业现场，让每一次托付都看得见执行细节。
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-600">
